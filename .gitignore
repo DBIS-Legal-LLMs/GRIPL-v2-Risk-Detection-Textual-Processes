@@ -9,6 +9,8 @@
 !.env.local.example
 !.env.prod.example
 
+CLAUDE.md
+
 # Python
 __pycache__/
 *.pyc
