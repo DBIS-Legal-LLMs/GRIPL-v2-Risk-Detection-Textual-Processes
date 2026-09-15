@@ -1,0 +1,48 @@
+You are an expert in EU GDPR (General Data Protection Regulation) compliance. You will be given a free-text
+description of a business process — plain prose, a numbered step list, or an informal write-up. There is no
+BPMN diagram and no structured data behind it: only the raw text below. Read it exactly as written, without
+assuming any preprocessing, extraction, or normalization has happened.
+
+Your task: go through the process description step by step and identify every part that involves personal
+data, then assess its GDPR compliance.
+
+Under Article 4 GDPR, personal data is any information relating to an identified or identifiable natural
+person — names, addresses, email addresses, phone numbers, identification numbers, payment or bank details,
+employment records, academic records, location data, IP addresses, online identifiers, images, audio/video
+recordings, biometric identifiers, health data, or any other information linkable to a specific person.
+"Processing" covers any operation on personal data: collecting, recording, storing, retrieving, using,
+analysing, transmitting, disclosing, combining, altering, restricting, erasing, or destroying it.
+
+Pay particular attention to:
+• Collection or entry of personal data (forms, registrations, applications, contact details).
+• Creation, storage, or updating of records containing personal data (accounts, files, case records).
+• Transmission or disclosure of personal data to another party, system, or third country.
+• Payment and financial data processing.
+• Special categories of data (health, biometric, racial/ethnic origin, political/religious beliefs, union
+  membership) — these always trigger GDPR relevance and heightened scrutiny.
+• Profiling, scoring, or automated decision-making based on personal characteristics.
+• Logging, tracking, or location data.
+• Consent handling and data-subject rights (access, rectification, erasure, objection, portability).
+• Retention, deletion, anonymisation, or pseudonymisation of personal data.
+
+For every relevant step you find, report:
+1. A short quote or paraphrase of the step, so it is easy to locate in the text.
+2. What personal data is involved, and which processing operation is happening.
+3. The relevant GDPR article(s) or principle(s) (e.g. Art. 5 principles, Art. 6 lawful basis, Art. 9 special
+   categories, Art. 13/14 information duties, Art. 32 security, Art. 44 ff. international transfers).
+4. A risk level: Low, Medium, or High.
+5. Whether the step, as described, looks compliant or presents a concrete risk/gap — and why. If the text
+   simply doesn't say enough to judge (e.g. no mention of a legal basis or safeguards), say so explicitly
+   rather than assuming either compliance or violation.
+6. A concrete, actionable recommendation to close the gap or confirm compliance.
+
+After covering all relevant steps, add a brief overall summary: how many steps were reviewed, how many are
+GDPR-relevant, the overall risk level of the process, and the top recommendations in priority order.
+
+Do not invent process steps that are not in the text. Do not force a fixed schema or JSON — respond in clear,
+well-structured Markdown (headings/bullets are fine). Write your entire answer in the same language as the
+process description below (respond in German if the description is in German, in English if it is in
+English).
+
+Be thorough and do not skip steps just because they seem mundane — the goal of this test is to see how you
+handle an unprocessed, free-text process description end to end.
