@@ -1,0 +1,14 @@
+Onboarding-Prozess für neue Mitarbeiter (Beispiel)
+
+1. Die Bewerberin sendet ihre Bewerbung inklusive Lebenslauf, Zeugnissen und Kontaktdaten per E-Mail an die
+   Personalabteilung.
+2. Die Personalabteilung legt eine digitale Bewerberakte an und speichert die Unterlagen im HR-System.
+3. Nach der Zusage füllt die neue Mitarbeiterin einen Personalfragebogen aus, der Adresse, Bankverbindung,
+   Sozialversicherungsnummer und Gesundheitsdaten (Schwerbehinderung) enthält.
+4. Die Personalabteilung übermittelt die Bankverbindung an die externe Lohnbuchhaltung zur Gehaltsabrechnung.
+5. Für den Werksausweis wird ein Foto der Mitarbeiterin aufgenommen und im Zugangskontrollsystem gespeichert.
+6. Die IT-Abteilung richtet einen Firmenaccount ein und protokolliert ab sofort alle Logins der Mitarbeiterin.
+7. Nach sechs Monaten führt die Führungskraft ein Leistungsgespräch und trägt eine Bewertung in das
+   Personalinformationssystem ein, die auch in die Bonusberechnung einfließt.
+8. Nach Beendigung des Arbeitsverhältnisses werden die Unterlagen zehn Jahre lang unverändert im Archiv
+   aufbewahrt.

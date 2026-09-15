@@ -9,6 +9,7 @@
 !.env.local.example
 !.env.prod.example
 
+scripts/output/
 CLAUDE.md
 
 # Python
