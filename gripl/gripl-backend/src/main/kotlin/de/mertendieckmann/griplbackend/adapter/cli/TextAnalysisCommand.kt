@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.adapter.cli
 
 import de.mertendieckmann.griplbackend.application.analyzer.AnalyzerFactory
 import de.mertendieckmann.griplbackend.config.LlmConfig
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import picocli.CommandLine.Command
@@ -12,12 +13,12 @@ import java.nio.file.Path
 import de.mertendieckmann.griplbackend.config.LlmConfig.Companion.LlmPropsOverride
 
 /**
- * Basic CLI test harness for Step 1 (activity extraction) of the text-analysis pipeline —
- * lets extraction quality be inspected on plain-text process descriptions without any frontend.
+ * CLI test harness for the two-step text-analysis pipeline (extraction + GDPR classification).
+ * With --extractOnly, only Step 1 (activity extraction) is run.
  */
 @Command(
     name = "text-analysis",
-    description = ["Extract process activities from a textual process description (Step 1 of the text-analysis pipeline, no GDPR classification yet)"],
+    description = ["Analyze a textual process description for GDPR compliance (two-step: activity extraction, then classification)"],
     mixinStandardHelpOptions = true
 )
 @Component
@@ -38,9 +39,12 @@ class TextAnalysisCommand(
     @Option(names = ["--timeoutSeconds"], description = ["Timeout in seconds for the LLM requests"], required = false) var timeoutSeconds: Long? = null
     @Option(names = ["--temperature"], description = ["Temperature setting for the LLM"], required = false) var temperature: Double? = null
     @Option(names = ["--topP"], description = ["Top-p setting for the LLM"], required = false) var topP: Double? = null
+    @Option(names = ["--extractOnly"], description = ["Only run Step 1 (activity extraction), skip GDPR classification"]) var extractOnly: Boolean = false
+    @Option(names = ["--useRag"], description = ["Use RAG context for the GDPR classification"]) var useRag: Boolean = false
+    @Option(names = ["--ragMode"], defaultValue = "HYBRID", description = ["RAG search mode: naive, local, global, hybrid (default)"]) lateinit var ragMode: RagMode
 
     override fun run() {
-        log.info { "Running text activity extraction on: $textFilePath with output format: $outputFormat" }
+        log.info { "Running text analysis on: $textFilePath (extractOnly=$extractOnly, useRag=$useRag) with output format: $outputFormat" }
         val processText = Files.readString(textFilePath)
 
         val llm = LlmConfig.buildStrictJsonModelWithOverride(LlmPropsOverride(
@@ -52,8 +56,10 @@ class TextAnalysisCommand(
             topP = topP
         ))
 
-        val extractor = analyzerFactory.createTextActivityExtractor(llm)
-        val result = extractor.extractActivities(processText)
-        CliOutput.print(result, outputFormat)
+        if (extractOnly) {
+            CliOutput.print(analyzerFactory.createTextActivityExtractor(llm).extractActivities(processText), outputFormat)
+        } else {
+            CliOutput.print(analyzerFactory.createTextAnalyzer(llm).analyzeTextForGdpr(processText, useRag, ragMode), outputFormat)
+        }
     }
 }

@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.application.analyzer
 
 import de.mertendieckmann.griplbackend.adapter.rag.RagApiClient
 import de.mertendieckmann.griplbackend.application.TextActivityExtractor
+import de.mertendieckmann.griplbackend.application.analyzer.TextAnalyzer
 import dev.langchain4j.model.chat.ChatModel
 import org.springframework.stereotype.Component
 
@@ -20,5 +21,9 @@ class AnalyzerFactory(
     // Step 1 of the (in-progress) text-analysis pipeline — see TextActivityExtractor.
     fun createTextActivityExtractor(chatModel: ChatModel): TextActivityExtractor {
         return TextActivityExtractor(chatModel)
+    }
+    // step 2
+    fun createTextAnalyzer(chatModel: ChatModel): TextAnalyzer {
+        return TextAnalyzer(createTextActivityExtractor(chatModel), createPromptEngineeringAnalyzer(chatModel))
     }
 }

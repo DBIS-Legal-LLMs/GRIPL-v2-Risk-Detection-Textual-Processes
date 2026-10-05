@@ -30,9 +30,16 @@ class PromptBpmnAnalyzer(
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
     override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
-        val sessionId = UUID.randomUUID().toString()
-
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
+        return analyzeElements(bpmnElements, useRag, ragMode, activitiesOnly)
+    }
+
+    /**
+     * Source-agnostic part of the pipeline: classifies an already extracted set of elements.
+     * Used by the BPMN path above and by [TextAnalyzer] (elements extracted from text).
+     */
+    fun analyzeElements(bpmnElements: Set<BpmnElement>, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
+        val sessionId = UUID.randomUUID().toString()
 
         if (useRag) {
             // RAG-augmented path
