@@ -10,7 +10,8 @@ import picocli.CommandLine.Command
     mixinStandardHelpOptions = true,
     subcommands = [
         AnalysisCommand::class,
-        EvaluationCommand::class
+        EvaluationCommand::class,
+        TextAnalysisCommand::class
     ]
 )
 @Component
