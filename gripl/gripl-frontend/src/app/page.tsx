@@ -13,7 +13,8 @@ import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
-import {Brain, BookOpen, Paperclip, FileText, ChevronDown, ChevronRight} from "lucide-react";
+import {Brain, BookOpen, Paperclip, FileText, ChevronDown, ChevronRight, Workflow} from "lucide-react";
+import TextSandbox from "@/components/sandbox/text-sandbox";
 
 const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-modal"), { ssr: false });
 
@@ -28,6 +29,8 @@ export default function Home() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true)
+  const [processText, setProcessText] = useState<string>("")
+  const [textAnalysisResult, setTextAnalysisResult] = useState<AnalysisResponse | null>(null)
 
   function handleCreateNewDiagram() {
     setAnalysisResult(null)
@@ -169,17 +172,40 @@ export default function Home() {
   ]
 
   return (
-      <main className="flex flex-col justify-center items-center h-full w-full">
-        <div className="w-full h-full">
-          <BpmnEditor
-              bpmnXml={diagram}
-              highlightedActivityIds={analysisResult?.criticalElements?.map(e => e.id) || []}
-              onNew={handleCreateNewDiagram}
-              onDiagramChanged={setDiagram}
-              cards={editorToolCards}
-              onEvent={onEvent}
-          />
-        </div>
+      <main className="flex flex-col h-full w-full min-h-0">
+        <Tabs defaultValue="bpmn" className="h-full w-full gap-0 min-h-0">
+          <div className="px-2 py-2 bg-card border-b">
+            <TabsList>
+              <TabsTrigger value="bpmn">
+                <Workflow className="h-4 w-4" />
+                BPMN Model
+              </TabsTrigger>
+              <TabsTrigger value="text">
+                <FileText className="h-4 w-4" />
+                Text Description
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          {/* forceMount keeps both views mounted, so the diagram (incl. zoom/undo) and the text survive tab switches */}
+          <TabsContent value="bpmn" forceMount className="min-h-0 data-[state=inactive]:hidden">
+            <BpmnEditor
+                bpmnXml={diagram}
+                highlightedActivityIds={analysisResult?.criticalElements?.map(e => e.id) || []}
+                onNew={handleCreateNewDiagram}
+                onDiagramChanged={setDiagram}
+                cards={editorToolCards}
+                onEvent={onEvent}
+            />
+          </TabsContent>
+          <TabsContent value="text" forceMount className="min-h-0 data-[state=inactive]:hidden">
+            <TextSandbox
+                processText={processText}
+                setProcessText={setProcessText}
+                analysisResult={textAnalysisResult}
+                setAnalysisResult={setTextAnalysisResult}
+            />
+          </TabsContent>
+        </Tabs>
 
         {pdfViewer && (
             <PdfViewerModal

@@ -22,12 +22,16 @@ import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 
 interface AnalysisToolCardProps {
-    bpmnXml: string;
+    bpmnXml?: string;
+    // When set, the card analyzes this textual process description instead of a BPMN diagram.
+    processText?: string;
     analysisResult: AnalysisResponse | null;
     setAnalysisResult: (result: AnalysisResponse | null) => void;
 }
 
-export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisResult }: AnalysisToolCardProps) {
+export default function AnalysisToolCard({ bpmnXml = "", processText, analysisResult, setAnalysisResult }: AnalysisToolCardProps) {
+    const isTextMode = processText !== undefined
+    const hasInput = isTextMode ? processText.trim().length > 0 : !!bpmnXml
 
     const [llmBaseUrl, setLlmBaseUrl] = useState<string>("")
     const [modelName, setModelName] = useState<string>("")
@@ -45,9 +49,13 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
         setAnalysisResult(null);
         setIsAnalyzing(true);
 
-        const xmlBlob = new Blob([bpmnXml], { type: "application/xml" });
         const formData = new FormData();
-        formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
+        if (isTextMode) {
+            formData.append("processText", processText);
+        } else {
+            const xmlBlob = new Blob([bpmnXml], { type: "application/xml" });
+            formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
+        }
 
         const llmProps = {
             baseUrl: llmBaseUrl || null,
@@ -64,7 +72,8 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             formData.append("ragMode", searchMode);
         }
 
-        fetch(`/api/gdpr/analysis/prompt-engineering`, {
+        const endpoint = isTextMode ? "text" : "prompt-engineering"
+        fetch(`/api/gdpr/analysis/${endpoint}`, {
             method: "POST",
             headers: {
                 Accept: "application/json"
@@ -83,7 +92,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
         }).catch(error => {
             console.error("Error during analysis:", error);
             setIsAnalyzing(false);
-            showError("Failed to analyze the diagram", toErrorMessage(error));
+            showError(isTextMode ? "Failed to analyze the text" : "Failed to analyze the diagram", toErrorMessage(error));
         })
     }
 
@@ -102,7 +111,11 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     return <Card className="max-w-80">
         <CardHeader>
             <CardTitle className="text-lg font-semibold">GRIPL Analysis Tool</CardTitle>
-            <CardDescription>Analyze the given BPMN diagram for GDPR compliance using the specified LLM. Critical elements will be highlighted in the diagram.</CardDescription>
+            <CardDescription>
+                {isTextMode
+                    ? "Analyze the given process description for GDPR compliance using the specified LLM. Activities are extracted from the text first, then classified."
+                    : "Analyze the given BPMN diagram for GDPR compliance using the specified LLM. Critical elements will be highlighted in the diagram."}
+            </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col space-y-2">
             <div className="space-y-1">
@@ -189,7 +202,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <Button
                 onClick={handleAnalyzeClick}
                 variant="default"
-                disabled={isAnalyzing || !bpmnXml}
+                disabled={isAnalyzing || !hasInput}
             >
                 <>{isAnalyzing ? <>
                     <Spinner className="text-white mr-2 h-4 w-4"/>
