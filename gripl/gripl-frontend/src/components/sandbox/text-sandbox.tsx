@@ -11,7 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Eraser, FileText } from "lucide-react";
 
 interface TextSandboxProps {
   processText: string;
@@ -44,7 +45,22 @@ export default function TextSandbox({
                 personal data.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col">
+            <CardContent className="flex flex-1 flex-col gap-2">
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setProcessText("");
+                    setAnalysisResult(null);
+                  }}
+                  disabled={!processText}
+                  title="Clear the process description"
+                >
+                  <Eraser className="h-4 w-4 mr-1" />
+                  Clear Text
+                </Button>
+              </div>
               <Textarea
                 className="flex-1 resize-none"
                 placeholder="e.g. The customer fills out an online registration form with their name, address and email. An employee then verifies the customer's identity..."
