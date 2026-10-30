@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { AnalysisResponse } from "@/models/dto/AnalysisDto";
 import AnalysisToolCard from "@/components/sandbox/analysis-tool-card";
 import AnalysisResultCard from "@/components/sandbox/analysis-result-card";
+import HighlightedText from "@/components/sandbox/highlighted-text";
 import {
   Card,
   CardContent,
@@ -12,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Eraser, FileText } from "lucide-react";
+import { Eraser, FileText, Pencil } from "lucide-react";
 
 interface TextSandboxProps {
   processText: string;
@@ -29,6 +31,11 @@ export default function TextSandbox({
   analysisResult,
   setAnalysisResult,
 }: TextSandboxProps) {
+  // After an analysis, the text is shown read-only with the critical passages highlighted
+  const isReadView = analysisResult !== null;
+  // The text is locked while an analysis runs, so the result always matches the analyzed text
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+
   return (
     <div className="flex h-full w-full gap-4 p-4">
       <div className="flex flex-1 min-w-0 justify-center overflow-y-auto">
@@ -46,7 +53,24 @@ export default function TextSandbox({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-2">
-              <div className="flex justify-end">
+              <div className="flex items-center justify-end gap-2">
+                {isReadView && (
+                  <>
+                    <span className="mr-auto text-xs text-muted-foreground">
+                      Hover over a highlighted passage to see the reasoning.
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAnalysisResult(null)}
+                      disabled={isAnalyzing}
+                      title="Edit the text (discards the analysis result)"
+                    >
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit Text
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -54,19 +78,27 @@ export default function TextSandbox({
                     setProcessText("");
                     setAnalysisResult(null);
                   }}
-                  disabled={!processText}
+                  disabled={!processText || isAnalyzing}
                   title="Clear the process description"
                 >
                   <Eraser className="h-4 w-4 mr-1" />
                   Clear Text
                 </Button>
               </div>
-              <Textarea
-                className="flex-1 resize-none"
-                placeholder="e.g. The customer fills out an online registration form with their name, address and email. An employee then verifies the customer's identity..."
-                value={processText}
-                onChange={(e) => setProcessText(e.target.value)}
-              />
+              {isReadView ? (
+                <HighlightedText
+                  text={processText}
+                  criticalElements={analysisResult.criticalElements}
+                />
+              ) : (
+                <Textarea
+                  className="flex-1 resize-none"
+                  placeholder="e.g. The customer fills out an online registration form with their name, address and email. An employee then verifies the customer's identity..."
+                  value={processText}
+                  onChange={(e) => setProcessText(e.target.value)}
+                  disabled={isAnalyzing}
+                />
+              )}
             </CardContent>
           </Card>
           {analysisResult && (
@@ -79,6 +111,7 @@ export default function TextSandbox({
           processText={processText}
           analysisResult={analysisResult}
           setAnalysisResult={setAnalysisResult}
+          onAnalyzingChange={setIsAnalyzing}
         />
       </div>
     </div>
