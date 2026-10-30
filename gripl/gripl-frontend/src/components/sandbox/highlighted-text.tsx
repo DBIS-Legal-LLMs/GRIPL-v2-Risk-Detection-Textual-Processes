@@ -99,7 +99,7 @@ export default function HighlightedText({
 
   return (
     <TooltipProvider delayDuration={100}>
-      <div className="flex-1 overflow-y-auto rounded-md border border-input px-3 py-2 text-base md:text-sm leading-loose whitespace-pre-wrap">
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-md border border-input px-3 py-2 text-base md:text-sm leading-loose whitespace-pre-wrap">
         {parts.map((part, index) => (
           <Fragment key={index}>{part}</Fragment>
         ))}

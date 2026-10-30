@@ -39,8 +39,8 @@ export default function TextSandbox({
   return (
     <div className="flex h-full w-full gap-4 p-4">
       <div className="flex flex-1 min-w-0 justify-center overflow-y-auto">
-        <div className="flex w-full max-w-3xl flex-col gap-4">
-          <Card className="flex flex-1 flex-col min-h-[320px]">
+        <div className="flex h-full w-full max-w-3xl flex-col gap-4">
+          <Card className="flex flex-1 flex-col min-h-[240px]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <FileText className="h-4 w-4" />
@@ -52,7 +52,7 @@ export default function TextSandbox({
                 personal data.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-2">
+            <CardContent className="flex flex-1 min-h-0 flex-col gap-2">
               <div className="flex items-center justify-end gap-2">
                 {isReadView && (
                   <>
