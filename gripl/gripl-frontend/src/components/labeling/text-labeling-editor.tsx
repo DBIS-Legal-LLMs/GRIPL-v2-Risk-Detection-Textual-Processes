@@ -135,6 +135,16 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
             {labels.length > 0 && <Card>
                 <CardHeader>
                     <h2 className="text-sm font-semibold">Labeled Activities</h2>
+                    <div className="flex gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                            <span className="inline-block h-2 w-2 rounded-full bg-destructive"/>
+                            GDPR critical
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="inline-block h-2 w-2 rounded-full bg-sky-500"/>
+                            Activity
+                        </span>
+                    </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-1">
                     {sortedLabels.map(label => {
