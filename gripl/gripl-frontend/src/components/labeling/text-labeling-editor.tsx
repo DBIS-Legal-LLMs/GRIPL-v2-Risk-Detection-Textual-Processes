@@ -118,7 +118,8 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
                 </CardContent>
             </Card>
             {isLabelMode && selectedLabel && <LabelingEditorLabelCard
-                elementName={excerpt(selectedLabel.text)}
+                elementName="Activity"
+                subtitle={selectedLabel.text}
                 elementId={selectedLabel.id}
                 criticalActivities={labels
                     .filter(label => label.isCritical)

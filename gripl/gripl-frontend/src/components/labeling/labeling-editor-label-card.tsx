@@ -13,11 +13,13 @@ export interface LabelingEditorProps {
     criticalActivities: ExpectedValues[];
     onLabelingChange: (elementId: string, isChecked: boolean, reason: string) => void;
     className?: string;
+    // Optional smaller line below the title, cut after two lines (the full text is shown on hover)
+    subtitle?: string;
     // When set, a remove icon is shown in the header (used for text labels, BPMN elements cannot be removed here)
     onRemove?: () => void;
 }
 
-export default function ({ elementName, elementId, criticalActivities, onLabelingChange, className, onRemove }: LabelingEditorProps) {
+export default function ({ elementName, elementId, criticalActivities, onLabelingChange, className, subtitle, onRemove }: LabelingEditorProps) {
 
     const [criticalChecked, setCriticalChecked] = useState(
         criticalActivities.some(critical => critical.value === elementId)
@@ -34,7 +36,12 @@ export default function ({ elementName, elementId, criticalActivities, onLabelin
 
     return <Card className={className ?? "w-[202px]"}>
         <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-            <h2 className="min-w-0 break-words text-lg font-semibold">{elementName}</h2>
+            <div className="min-w-0">
+                <h2 className="break-words text-lg font-semibold">{elementName}</h2>
+                {subtitle && <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground" title={subtitle}>
+                    {subtitle}
+                </p>}
+            </div>
             {onRemove && <Button
                 variant="ghost"
                 size="icon"
