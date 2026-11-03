@@ -13,7 +13,7 @@ import React from "react";
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {useRouter} from "next/navigation";
-import {Plus} from "lucide-react";
+import {FileText, Plus, Workflow} from "lucide-react";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
 import {Dataset} from "@/models/dto/Dataset";
 import {useToast} from "@/components/ui/toast";
@@ -23,10 +23,19 @@ interface CreateTestCaseButtonProps {
     dataset: Dataset;
 }
 
+type TestCaseModality = "bpmn" | "text" | "both";
+
+const modalityOptions: { value: TestCaseModality, label: string, icon: React.ReactNode }[] = [
+    {value: "bpmn", label: "BPMN Model", icon: <Workflow className="h-4 w-4"/>},
+    {value: "text", label: "Text", icon: <FileText className="h-4 w-4"/>},
+    {value: "both", label: "Both", icon: <><Workflow className="h-4 w-4"/><FileText className="h-4 w-4"/></>},
+]
+
 export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonProps) {
 
     const router = useRouter()
     const [showCreateTestCaseDialog, setShowCreateTestCaseDialog] = React.useState(false)
+    const [modality, setModality] = React.useState<TestCaseModality>("bpmn")
     const {showToast, showError} = useToast()
 
     function handleTestCaseCreation() {
@@ -36,9 +45,18 @@ export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonPr
             return;
         }
 
-        const xmlBlob = new Blob([emptyDiagram as string], { type: "application/xml" });
         const formData = new FormData();
-        formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
+        if (modality !== "text") {
+            const xmlBlob = new Blob([emptyDiagram as string], { type: "application/xml" });
+            formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
+        }
+        if (modality !== "bpmn") {
+            const textDescriptionBlob = new Blob(
+                [JSON.stringify({processText: "", textLabels: []})],
+                { type: 'application/json' }
+            );
+            formData.append('textDescription', textDescriptionBlob, 'textDescription.json');
+        }
         formData.append("name", testCaseName);
         const expectedValuesBlob = new Blob(
             [JSON.stringify([])],
@@ -81,6 +99,23 @@ export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonPr
                     <div className="space-y-2">
                         <Label htmlFor="test-case-name">Name</Label>
                         <Input id="test-case-name" placeholder={"name"}/>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Type</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {modalityOptions.map(option => <Button
+                                key={option.value}
+                                type="button"
+                                variant={modality === option.value ? "default" : "outline"}
+                                onClick={() => setModality(option.value)}
+                            >
+                                {option.icon}
+                                {option.label}
+                            </Button>)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            The missing part can be added later to pair the model and the text of the same process.
+                        </p>
                     </div>
                 </div>
             </div>

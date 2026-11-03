@@ -10,9 +10,10 @@ export interface LabelingEditorProps {
     elementId: string;
     criticalActivities: ExpectedValues[];
     onLabelingChange: (elementId: string, isChecked: boolean, reason: string) => void;
+    className?: string;
 }
 
-export default function ({ elementName, elementId, criticalActivities, onLabelingChange }: LabelingEditorProps) {
+export default function ({ elementName, elementId, criticalActivities, onLabelingChange, className }: LabelingEditorProps) {
 
     const [criticalChecked, setCriticalChecked] = useState(
         criticalActivities.some(critical => critical.value === elementId)
@@ -27,26 +28,26 @@ export default function ({ elementName, elementId, criticalActivities, onLabelin
         setReason(foundReason);
     }, [elementId]);
 
-    return <Card className="w-[202px]">
+    return <Card className={className ?? "w-[202px]"}>
         <CardHeader>
             <h2 className="text-lg font-semibold">{elementName}</h2>
         </CardHeader>
         <CardContent>
             <div className="flex items-center space-x-2">
                 <Switch
-                    id="label-mode"
+                    id={`critical-${elementId}`}
                     checked={criticalChecked}
                     onCheckedChange={(checked) => {
                         setCriticalChecked(checked)
                         onLabelingChange(elementId, checked, reason)
                     }}
                 />
-                <Label htmlFor="label-mode">Is GDPR critical</Label>
+                <Label htmlFor={`critical-${elementId}`}>Is GDPR critical</Label>
             </div>
             { criticalChecked && <div className="mt-4 flex flex-col space-y-2">
-                <Label htmlFor="reason">Reason for labeling</Label>
+                <Label htmlFor={`reason-${elementId}`}>Reason for labeling</Label>
                 <Textarea
-                    id="reason"
+                    id={`reason-${elementId}`}
                     className="p-2 border rounded"
                     placeholder="Enter reason for labeling this activity..."
                     rows={5}
