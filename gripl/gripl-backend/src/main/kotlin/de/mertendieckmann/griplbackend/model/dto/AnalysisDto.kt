@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.model.dto
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.model.BpmnElement
 import de.mertendieckmann.griplbackend.model.analysis.BpmnAnalysisResult
@@ -15,7 +16,11 @@ data class AnalysisResponse(
         val name: String?,
         val type: String? = null,
         val reason: String,
-        val references: List<LlmReference> = emptyList()
+        val references: List<LlmReference> = emptyList(),
+        // Text analysis only: text passage of the process description this activity was extracted from.
+        // Exluded from the JSON when null, so BPMN responses stay unchanged.
+        @get:JsonInclude(JsonInclude.Include.NON_NULL)
+        val exactText: String? = null
     )
 
     companion object {

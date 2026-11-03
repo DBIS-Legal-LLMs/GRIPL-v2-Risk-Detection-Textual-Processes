@@ -30,11 +30,17 @@ class EvaluationRunner(
         val metricsAccumulator = MetricsAccumulator()
         val startedCounter = AtomicInteger(0)
 
-        val entriesFlow = (if (request.evaluationDataIds.isNotEmpty()) {
+        val entries = if (request.evaluationDataIds.isNotEmpty()) {
             evaluationDataRepository.getEvaluationDataByIds(request.evaluationDataIds)
         } else {
             evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
-        }).sortedBy { it.id }.asFlow()
+        }
+        // The evaluation scores BPMN models only — text-only test cases are skipped
+        val (bpmnEntries, textOnlyEntries) = entries.partition { it.bpmnXml != null }
+        if (textOnlyEntries.isNotEmpty()) {
+            log.info { "Skipping ${textOnlyEntries.size} test case(s) without a BPMN model: ${textOnlyEntries.map { it.id }}" }
+        }
+        val entriesFlow = bpmnEntries.sortedBy { it.id }.asFlow()
 
         log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 
@@ -81,7 +87,8 @@ class EvaluationRunner(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome {
-        val actualResult = evaluator.evaluate(entry.bpmnXml, evaluationRequest)
+        val bpmnXml = requireNotNull(entry.bpmnXml) { "Test case ${entry.id} has no BPMN model" }
+        val actualResult = evaluator.evaluate(bpmnXml, evaluationRequest)
 
         if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragPromptContext == null) {
             return EvaluationOutcome.Error(
@@ -97,7 +104,7 @@ class EvaluationRunner(
             )
         }
 
-        val bpmnModel = parseBpmn(entry.bpmnXml)
+        val bpmnModel = parseBpmn(bpmnXml)
         val bpmnElements = bpmnExtractor.extractBpmnElements(bpmnModel)
 
         // With activitiesOnly, scoring is restricted to activities

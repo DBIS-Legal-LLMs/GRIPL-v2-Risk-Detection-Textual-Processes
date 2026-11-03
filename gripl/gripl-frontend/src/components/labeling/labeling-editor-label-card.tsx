@@ -4,15 +4,22 @@ import {Label} from "@/components/ui/label";
 import {Textarea} from "@/components/ui/textarea";
 import {useEffect, useState} from "react";
 import {ExpectedValues} from "@/models/dto/EvaluationData";
+import {Button} from "@/components/ui/button";
+import {Trash2} from "lucide-react";
 
 export interface LabelingEditorProps {
     elementName: string;
     elementId: string;
     criticalActivities: ExpectedValues[];
     onLabelingChange: (elementId: string, isChecked: boolean, reason: string) => void;
+    className?: string;
+    // Optional smaller line below the title, cut after two lines (the full text is shown on hover)
+    subtitle?: string;
+    // When set, a remove icon is shown in the header (used for text labels, BPMN elements cannot be removed here)
+    onRemove?: () => void;
 }
 
-export default function ({ elementName, elementId, criticalActivities, onLabelingChange }: LabelingEditorProps) {
+export default function ({ elementName, elementId, criticalActivities, onLabelingChange, className, subtitle, onRemove }: LabelingEditorProps) {
 
     const [criticalChecked, setCriticalChecked] = useState(
         criticalActivities.some(critical => critical.value === elementId)
@@ -27,26 +34,41 @@ export default function ({ elementName, elementId, criticalActivities, onLabelin
         setReason(foundReason);
     }, [elementId]);
 
-    return <Card className="w-[202px]">
-        <CardHeader>
-            <h2 className="text-lg font-semibold">{elementName}</h2>
+    return <Card className={className ?? "w-[202px]"}>
+        <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
+            <div className="min-w-0">
+                <h2 className="break-words text-lg font-semibold">{elementName}</h2>
+                {subtitle && <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground" title={subtitle}>
+                    {subtitle}
+                </p>}
+            </div>
+            {onRemove && <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={onRemove}
+                title="Remove label"
+                aria-label="Remove label"
+            >
+                <Trash2 className="h-4 w-4"/>
+            </Button>}
         </CardHeader>
         <CardContent>
             <div className="flex items-center space-x-2">
                 <Switch
-                    id="label-mode"
+                    id={`critical-${elementId}`}
                     checked={criticalChecked}
                     onCheckedChange={(checked) => {
                         setCriticalChecked(checked)
                         onLabelingChange(elementId, checked, reason)
                     }}
                 />
-                <Label htmlFor="label-mode">Is GDPR critical</Label>
+                <Label htmlFor={`critical-${elementId}`}>Is GDPR critical</Label>
             </div>
             { criticalChecked && <div className="mt-4 flex flex-col space-y-2">
-                <Label htmlFor="reason">Reason for labeling</Label>
+                <Label htmlFor={`reason-${elementId}`}>Reason for labeling</Label>
                 <Textarea
-                    id="reason"
+                    id={`reason-${elementId}`}
                     className="p-2 border rounded"
                     placeholder="Enter reason for labeling this activity..."
                     rows={5}

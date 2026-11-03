@@ -22,6 +22,8 @@ class EvaluationDataRepository(
             bpmnXml = rs.getString("bpmn_xml"),
             expectedJson = rs.getString("expected_values"),
             datasetId = rs.getLong("dataset_id"),
+            processText = rs.getString("process_text"),
+            textLabelsJson = rs.getString("text_labels"),
         )
     }
 
@@ -49,44 +51,43 @@ class EvaluationDataRepository(
 
     fun insertEvaluationData(data: EvaluationDataWithOptionalId): Int? {
         val sql = """
-            INSERT INTO evaluation_data (name, bpmn_xml, expected_values, dataset_id)
-            VALUES (?, ?, ?::jsonb, ?)
+            INSERT INTO evaluation_data (name, bpmn_xml, expected_values, dataset_id, process_text, text_labels)
+            VALUES (?, ?, ?::jsonb, ?, ?, ?::jsonb)
             RETURNING id
         """.trimIndent()
-
-        val json  = objectMapper.writeValueAsString(data.expectedValues)
-        val value = PGobject().apply { type = "jsonb"; this.value = json }
 
         return jdbc.queryForObject(
             sql,
             Int::class.java,
             data.name,
             data.bpmnXml,
-            value,
-            data.datasetId
+            toJsonb(data.expectedValues),
+            data.datasetId,
+            data.processText,
+            toJsonb(data.textLabels)
         )!!
     }
 
     fun updateEvaluationData(data: EvaluationData): Int {
         val sql = """
             UPDATE evaluation_data
-            SET name = ?, bpmn_xml = ?, expected_values = ?::jsonb, updated_at = CURRENT_TIMESTAMP
+            SET name = ?, bpmn_xml = ?, expected_values = ?::jsonb, process_text = ?, text_labels = ?::jsonb,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """.trimIndent()
 
         return jdbc.update(sql) { ps ->
             ps.setString(1, data.name)
             ps.setString(2, data.bpmnXml)
-
-            val json     = objectMapper.writeValueAsString(data.expectedValues)
-            val pgObject = PGobject().apply {
-                type  = "jsonb"
-                value = json
-            }
-            ps.setObject(3, pgObject)
-            ps.setLong(4, data.id)
+            ps.setObject(3, toJsonb(data.expectedValues))
+            ps.setString(4, data.processText)
+            ps.setObject(5, toJsonb(data.textLabels))
+            ps.setLong(6, data.id)
         }
     }
+
+    private fun toJsonb(value: Any): PGobject =
+        PGobject().apply { type = "jsonb"; this.value = objectMapper.writeValueAsString(value) }
 
     fun deleteEvaluationData(id: Long): Int {
         val sql = "DELETE FROM evaluation_data WHERE id = ?"
@@ -96,7 +97,8 @@ class EvaluationDataRepository(
     fun countEvaluationDataForDatasets(datasetIds: List<Long>): Int {
         if (datasetIds.isEmpty()) return 0
         val inSql = datasetIds.joinToString(",")
-        val sql = "SELECT COUNT(*) FROM evaluation_data WHERE dataset_id IN ($inSql)"
+        // Only test cases with a BPMN model are evaluated (see EvaluationRunner)
+        val sql = "SELECT COUNT(*) FROM evaluation_data WHERE dataset_id IN ($inSql) AND bpmn_xml IS NOT NULL"
         return jdbc.queryForObject(sql, Int::class.java) ?: 0
     }
 }

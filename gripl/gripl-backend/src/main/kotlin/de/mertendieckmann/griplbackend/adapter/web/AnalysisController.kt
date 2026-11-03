@@ -111,6 +111,40 @@ class AnalysisController(
         }.map { ResponseEntity.ok(it) }
     }
 
+    @Operation(
+        summary = "Analyzes a textual process description for GDPR relevance (two-step pipeline)",
+        description = "Send the process description as form field **processText**. Step 1 extracts the activities from the text,"
+            + " step 2 classifies them with the prompt-engineering pipeline (activities only). Returns the GDPR-relevant"
+            + " activities with their synthetic IDs (activity-1, activity-2, ...) and the reasoning for each activity."
+    )
+    @PostMapping(
+        "/text",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeTextForGdpr(
+        @RequestPart("processText") processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> {
+
+        val processText = processTextPart.value()
+        if (processText.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "processText must not be empty")
+        }
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = parseRagMode(ragModePart)
+        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
+
+        return Mono.fromCallable {
+            val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
+            val analyzer = analyzerFactory.createTextAnalyzer(llm)
+            analyzer.analyzeTextForGdpr(processText, useRag, ragMode)
+        }.subscribeOn(Schedulers.boundedElastic())
+            .map { ResponseEntity.ok(it) }
+    }
+
     private fun parseRagMode(ragModePart: org.springframework.http.codec.multipart.FormFieldPart?): RagMode {
         val raw = ragModePart?.value() ?: return RagMode.HYBRID
         return try {

@@ -21,7 +21,13 @@ class TextAnalyzer(
 
     fun analyzeTextForGdpr(processText: String, useRag: Boolean = false, ragMode: RagMode = RagMode.HYBRID): AnalysisResponse {
         val extraction = extractor.extractActivities(processText)
-        return elementAnalyzer.analyzeElements(toBpmnElements(extraction), useRag, ragMode, activitiesOnly = true)
+        val response = elementAnalyzer.analyzeElements(toBpmnElements(extraction), useRag, ragMode, activitiesOnly = true)
+
+        // Attach the source passage of each critical activity, so the frontend can highlight it in the text
+        val exactTextById = extraction.activities.associate { it.id to it.exactText }
+        return response.copy(
+            criticalElements = response.criticalElements.map { it.copy(exactText = exactTextById[it.id]) }
+        )
     }
 
     companion object {
