@@ -117,21 +117,16 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
                     </p>
                 </CardContent>
             </Card>
-            {isLabelMode && selectedLabel && <div className="flex flex-col gap-2">
-                <LabelingEditorLabelCard
-                    elementName={excerpt(selectedLabel.text)}
-                    elementId={selectedLabel.id}
-                    criticalActivities={labels
-                        .filter(label => label.isCritical)
-                        .map(label => ({value: label.id, reason: label.reason}))}
-                    onLabelingChange={handleLabelingChange}
-                    className="w-full"
-                />
-                <Button variant="outline" size="sm" onClick={() => handleDeleteLabel(selectedLabel.id)}>
-                    <Trash2 className="h-4 w-4 mr-1"/>
-                    Remove Label
-                </Button>
-            </div>}
+            {isLabelMode && selectedLabel && <LabelingEditorLabelCard
+                elementName={excerpt(selectedLabel.text)}
+                elementId={selectedLabel.id}
+                criticalActivities={labels
+                    .filter(label => label.isCritical)
+                    .map(label => ({value: label.id, reason: label.reason}))}
+                onLabelingChange={handleLabelingChange}
+                className="w-full"
+                onRemove={() => handleDeleteLabel(selectedLabel.id)}
+            />}
             {labels.length > 0 && <Card>
                 <CardHeader>
                     <h2 className="text-sm font-semibold">Labeled Activities</h2>
