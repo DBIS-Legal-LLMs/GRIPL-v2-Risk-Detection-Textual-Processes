@@ -30,25 +30,24 @@ class EvaluationRunner(
         val metricsAccumulator = MetricsAccumulator()
         val startedCounter = AtomicInteger(0)
 
-        val entries = if (request.evaluationDataIds.isNotEmpty()) {
-            evaluationDataRepository.getEvaluationDataByIds(request.evaluationDataIds)
-        } else {
-            evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
+        val entries = loadTestCases(evaluationDataRepository, request.evaluationDataIds, request.datasets)
+        // Only test cases providing the run's modality (and, with pairedOnly, all modalities of the run)
+        val selectedEntries = selectTestCases(entries, request.modality, request.requiredModalities)
+        val skippedIds = entries.map { it.id } - selectedEntries.map { it.id }.toSet()
+        if (skippedIds.isNotEmpty()) {
+            log.info { "Skipping ${skippedIds.size} test case(s) not available for ${request.modality}" +
+                (if (request.requiredModalities.isNotEmpty()) " (paired with ${request.requiredModalities})" else "") +
+                ": $skippedIds" }
         }
-        // The evaluation scores BPMN models only — text-only test cases are skipped
-        val (bpmnEntries, textOnlyEntries) = entries.partition { it.bpmnXml != null }
-        if (textOnlyEntries.isNotEmpty()) {
-            log.info { "Skipping ${textOnlyEntries.size} test case(s) without a BPMN model: ${textOnlyEntries.map { it.id }}" }
-        }
-        val entriesFlow = bpmnEntries.sortedBy { it.id }.asFlow()
+        val entriesFlow = selectedEntries.sortedBy { it.id }.asFlow()
 
-        log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
+        log.info { "Starting evaluation with modality=${request.modality}; endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 
         return entriesFlow
             .flatMapMerge(concurrency = request.maxConcurrent.coerceAtLeast(1)) { entry ->
                 flow {
                     val currentNumber = startedCounter.incrementAndGet()
-                    emit(buildStepInfo(entry, currentNumber, entriesFlow.count()))
+                    emit(buildStepInfo(entry, currentNumber, selectedEntries.size))
 
                     when (val outcome = evaluateSingleEntry(entry, request)) {
                         is EvaluationOutcome.Error -> {

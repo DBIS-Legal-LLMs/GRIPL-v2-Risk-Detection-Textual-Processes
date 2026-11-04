@@ -33,7 +33,11 @@ data class EvaluationMetadataReport(
     val defaultEvaluationEndpoint: String,
     val seed: Int? = null,
     val totalRepetitions: Int = 1,
-    val activitiesOnly: Boolean = false
+    val activitiesOnly: Boolean = false,
+    val modalities: List<EvaluationModality> = listOf(EvaluationModality.BPMN),
+    val pairedOnly: Boolean = false,
+    /** Evaluated test cases per modality; [totalTestCases] counts the distinct test cases over all modalities. */
+    val totalTestCasesByModality: Map<EvaluationModality, Int> = emptyMap()
 ): EvaluationReport() {
     override fun toMarkdown(): String {
         return """
@@ -43,13 +47,19 @@ data class EvaluationMetadataReport(
             |- **Top Ps:** ${modelTopPs.joinToString(", ") { it?.toString() ?: "default" }}
             |- **Datasets:** ${datasets.joinToString(", ")}
             |- **Total Test Cases:** $totalTestCases
-            |- **Evaluation Scope:** ${if (activitiesOnly) "Activities only" else "All BPMN elements"}
+            |- **Evaluation Scope:** ${if (activitiesOnly) "Activities only" else "All BPMN elements"}$modalitiesLine
             |${if (totalRepetitions > 1) "- **Repetitions:** $totalRepetitions" else ""}
             |${if (seed != null) "- **Seed:** $seed" else ""}
             |- **Timestamp:** $timestamp
             |- **Default Evaluation Endpoint:** $defaultEvaluationEndpoint
         """.trimMargin()
     }
+
+    // Only for runs beyond the BPMN-only default, so BPMN-only reports stay unchanged
+    private val modalitiesLine: String
+        get() = if (modalities == listOf(EvaluationModality.BPMN)) "" else
+            "\n- **Modalities:** " + modalities.joinToString(", ") { "${it.label} (${totalTestCasesByModality[it] ?: 0} test cases)" } +
+                (if (pairedOnly) ", paired test cases only" else "")
 
     data class DatasetInfo(
         val id: Long,

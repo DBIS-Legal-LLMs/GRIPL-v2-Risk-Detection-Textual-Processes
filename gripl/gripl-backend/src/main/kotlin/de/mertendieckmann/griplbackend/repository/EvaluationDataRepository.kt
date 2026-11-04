@@ -93,12 +93,4 @@ class EvaluationDataRepository(
         val sql = "DELETE FROM evaluation_data WHERE id = ?"
         return jdbc.update(sql, id)
     }
-
-    fun countEvaluationDataForDatasets(datasetIds: List<Long>): Int {
-        if (datasetIds.isEmpty()) return 0
-        val inSql = datasetIds.joinToString(",")
-        // Only test cases with a BPMN model are evaluated (see EvaluationRunner)
-        val sql = "SELECT COUNT(*) FROM evaluation_data WHERE dataset_id IN ($inSql) AND bpmn_xml IS NOT NULL"
-        return jdbc.queryForObject(sql, Int::class.java) ?: 0
-    }
 }

@@ -14,6 +14,10 @@ data class MultiEvaluationRequest(
     val ragMode: RagMode = RagMode.HYBRID,
     val evaluateRag: Boolean = true,
     val activitiesOnly: Boolean = false,
+    /** Modalities every model is evaluated with; more than one adds the modality to the model label. */
+    val modalities: List<EvaluationModality> = listOf(EvaluationModality.BPMN),
+    /** Only evaluate test cases that provide all [modalities], so the modalities are compared on the same processes. */
+    val pairedOnly: Boolean = false,
 )
 
 data class ModelRunConfig(

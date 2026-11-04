@@ -1,6 +1,7 @@
 package de.mertendieckmann.griplbackend.evaluation
 
 import de.mertendieckmann.griplbackend.model.dto.EvaluationMetadataReport
+import de.mertendieckmann.griplbackend.model.dto.EvaluationModality
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.ModelReportEnvelope
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
@@ -23,61 +24,87 @@ class MultiEvaluationRunner(
 
     fun runAll(request: MultiEvaluationRequest): Flow<ModelReportEnvelope> = flow {
         require(request.models.isNotEmpty()) { "models must not be empty" }
+        require(request.modalities.isNotEmpty()) { "modalities must not be empty" }
+        require(request.modalities.all { it in SUPPORTED_MODALITIES }) {
+            "Unsupported modalities ${request.modalities - SUPPORTED_MODALITIES}; supported: $SUPPORTED_MODALITIES"
+        }
 
+        val modalities = request.modalities.distinct()
         val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
         val repetitions = request.repetitions.coerceAtLeast(1)
-        emit(ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions), 1))
+        emit(ModelReportEnvelope("", createMetadata(request, modalities, baseSeed, repetitions), 1))
 
         for (runNumber in 1..repetitions) {
             log.info { "Starting evaluation run $runNumber/$repetitions" }
 
-            for ((index, model) in request.models.withIndex()) {
-                val effectiveEndpoint = model.evaluationEndpoint ?: request.defaultEvaluationEndpoint
-                log.info { "Run $runNumber - Starting model ${index + 1}/${request.models.size}: '${model.label}' @ $effectiveEndpoint" }
+            // The seed only depends on the run, so all modalities and models of a run share it
+            val runSeed = deriveRunSeed(baseSeed, runNumber)
 
-                val runSeed = deriveRunSeed(baseSeed, runNumber)
+            for (modality in modalities) {
+                for ((index, model) in request.models.withIndex()) {
+                    val effectiveEndpoint = model.evaluationEndpoint ?: request.defaultEvaluationEndpoint
+                    val label = runLabel(model.label, modality, modalities)
+                    log.info { "Run $runNumber - Starting model ${index + 1}/${request.models.size}: '$label' @ $effectiveEndpoint" }
 
-                val singleRequest = EvaluationRequest(
-                    evaluationEndpoint = effectiveEndpoint,
-                    llmProps = model.llmProps?.copy(seed = runSeed),
-                    maxConcurrent = request.maxConcurrent,
-                    datasets = request.datasets,
-                    evaluationDataIds = request.evaluationDataIds,
-                    useRag = request.useRag,
-                    ragMode = request.ragMode,
-                    evaluateRag = request.evaluateRag,
-                    activitiesOnly = request.activitiesOnly
-                )
+                    val singleRequest = EvaluationRequest(
+                        evaluationEndpoint = effectiveEndpoint,
+                        llmProps = model.llmProps?.copy(seed = runSeed),
+                        maxConcurrent = request.maxConcurrent,
+                        datasets = request.datasets,
+                        evaluationDataIds = request.evaluationDataIds,
+                        useRag = request.useRag,
+                        ragMode = request.ragMode,
+                        evaluateRag = request.evaluateRag,
+                        activitiesOnly = request.activitiesOnly,
+                        modality = modality,
+                        requiredModalities = if (request.pairedOnly) modalities.toSet() else emptySet()
+                    )
 
-                singleRunner.run(singleRequest)
-                    .map { event -> ModelReportEnvelope(model.label, event, runNumber) }
-                    .collect { wrapped -> emit(wrapped) }
+                    singleRunner.run(singleRequest)
+                        .map { event -> ModelReportEnvelope(label, event, runNumber, modality) }
+                        .collect { wrapped -> emit(wrapped) }
 
-                log.info { "Run $runNumber - Finished model '${model.label}'" }
+                    log.info { "Run $runNumber - Finished model '$label'" }
+                }
             }
         }
     }
 
-    private fun createMetadata(request: MultiEvaluationRequest, seed: Int, repetitions: Int): EvaluationMetadataReport {
+    private fun createMetadata(
+        request: MultiEvaluationRequest,
+        modalities: List<EvaluationModality>,
+        seed: Int,
+        repetitions: Int
+    ): EvaluationMetadataReport {
         val datasets = datasetRepository.getDatasetsByIds(request.datasets.map { it.toLong() })
-        val totalTestCases = if (request.evaluationDataIds.isNotEmpty()) {
-            request.evaluationDataIds.size
-        } else {
-            evaluationDataRepository.countEvaluationDataForDatasets(request.datasets.map { it.toLong() })
-        }
+
+        // Same selection as the EvaluationRunner, so the counts match the test cases actually evaluated
+        val testCases = loadTestCases(evaluationDataRepository, request.evaluationDataIds, request.datasets)
+        val requiredModalities = if (request.pairedOnly) modalities.toSet() else emptySet()
+        val selectedByModality = modalities.associateWith { selectTestCases(testCases, it, requiredModalities) }
+
+        // One entry per evaluated label, in the order the runs are emitted
+        val runs = modalities.flatMap { modality -> request.models.map { model -> modality to model } }
 
         return EvaluationMetadataReport(
-            modelLabels = request.models.map { it.label },
-            modelTemperatures = request.models.map { it.llmProps?.temperature },
-            modelTopPs = request.models.map { it.llmProps?.topP },
+            modelLabels = runs.map { (modality, model) -> runLabel(model.label, modality, modalities) },
+            modelTemperatures = runs.map { (_, model) -> model.llmProps?.temperature },
+            modelTopPs = runs.map { (_, model) -> model.llmProps?.topP },
             datasets = datasets.map { EvaluationMetadataReport.DatasetInfo(it.id, it.name) },
-            totalTestCases = totalTestCases,
+            totalTestCases = selectedByModality.values.flatten().map { it.id }.distinct().size,
             seed = seed,
             defaultEvaluationEndpoint = request.defaultEvaluationEndpoint,
             totalRepetitions = repetitions,
-            activitiesOnly = request.activitiesOnly
+            activitiesOnly = request.activitiesOnly,
+            modalities = modalities,
+            pairedOnly = request.pairedOnly,
+            totalTestCasesByModality = selectedByModality.mapValues { it.value.size }
         )
     }
+
+    /** With several modalities the model label carries the modality, e.g. "GPT-4o [TEXT]"; otherwise it is unchanged. */
+    private fun runLabel(modelLabel: String, modality: EvaluationModality, modalities: List<EvaluationModality>): String =
+        if (modalities.size > 1) "$modelLabel [${modality.label}]" else modelLabel
 
     /**
      * Stable and deterministic derivation of a run-specific seed from a base seed and the run number.
@@ -93,5 +120,10 @@ class MultiEvaluationRunner(
         val raw = ByteBuffer.wrap(hash, 0, 4).order(ByteOrder.BIG_ENDIAN).int
         val position = raw and 0x7fffffff
         return if (position == 0) 1 else position
+    }
+
+    companion object {
+        /** Modalities the evaluation can score; TEXT is added once the text modality is wired into the runner. */
+        val SUPPORTED_MODALITIES = setOf(EvaluationModality.BPMN)
     }
 }
