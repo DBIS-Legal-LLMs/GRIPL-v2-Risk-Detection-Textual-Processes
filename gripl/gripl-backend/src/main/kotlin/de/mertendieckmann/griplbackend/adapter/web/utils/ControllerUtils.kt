@@ -18,7 +18,8 @@ object ControllerUtils {
     }
 
     inline fun <reified T> resolveEnvironmentVariables(objectToResolve: T?, env: Environment): T? {
-        return objectToResolve.let {
+        // Null (e.g. no llmProps sent) stays null: deserializing "null" into the non-null type T would throw
+        return objectToResolve?.let {
             jacksonObjectMapper().readValue<T>(
                 env.resolvePlaceholders(jacksonObjectMapper().writeValueAsString(it))
             )
