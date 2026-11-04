@@ -23,10 +23,14 @@ class TextAnalyzer(
         val extraction = extractor.extractActivities(processText)
         val response = elementAnalyzer.analyzeElements(toBpmnElements(extraction), useRag, ragMode, activitiesOnly = true)
 
-        // Attach the source passage of each critical activity, so the frontend can highlight it in the text
+        // Attach the source passage of each critical activity, so the frontend can highlight it in the text,
+        // and the full extraction, so the evaluation can score non-critical activities and the extraction itself
         val exactTextById = extraction.activities.associate { it.id to it.exactText }
         return response.copy(
-            criticalElements = response.criticalElements.map { it.copy(exactText = exactTextById[it.id]) }
+            criticalElements = response.criticalElements.map { it.copy(exactText = exactTextById[it.id]) },
+            extractedActivities = extraction.activities.map {
+                AnalysisResponse.ExtractedActivity(id = it.id, name = it.name, exactText = it.exactText)
+            }
         )
     }
 

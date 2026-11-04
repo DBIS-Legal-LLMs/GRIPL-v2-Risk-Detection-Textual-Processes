@@ -5,6 +5,14 @@ export interface AnalysisRequest {
 export interface AnalysisResponse {
   criticalElements: CriticalElement[];
   ragContext?: Record<string, RagElementContext>;
+  // Text analysis only: all activities extracted from the text, critical or not
+  extractedActivities?: ExtractedActivity[];
+}
+
+export interface ExtractedActivity {
+  id: string;
+  name: string;
+  exactText: string;
 }
 
 export interface CriticalElement {

@@ -9,8 +9,20 @@ data class AnalysisResponse(
     val criticalElements: List<CriticalElement>,
     val amountOfRetries: Int? = null,
     val ragContext: Map<String, RagElementContext>? = null,
-    val ragPromptContext: List<String>? = null
+    val ragPromptContext: List<String>? = null,
+    // Text analysis only: all activities extracted in step 1, critical or not. The evaluation needs the
+    // non-critical ones too (true negatives, extraction quality). Excluded from the JSON when null, so BPMN
+    // responses stay unchanged.
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val extractedActivities: List<ExtractedActivity>? = null
 ) {
+    data class ExtractedActivity(
+        val id: String,
+        val name: String,
+        // Text passage of the process description the activity was extracted from
+        val exactText: String
+    )
+
     data class CriticalElement(
         val id: String,
         val name: String?,
