@@ -1,0 +1,10 @@
+defaultEvaluationEndpoint: /gdpr/analysis/prompt-engineering
+seed: 42
+maxConcurrent: 2
+modalities: [BPMN, TEXT]
+pairedOnly: true
+activitiesOnly: true
+evaluateRag: false
+models:
+  - label: Default
+datasets: [1]

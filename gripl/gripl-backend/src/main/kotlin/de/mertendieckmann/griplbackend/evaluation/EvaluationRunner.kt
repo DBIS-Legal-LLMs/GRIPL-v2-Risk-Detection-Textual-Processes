@@ -5,7 +5,10 @@ import de.mertendieckmann.griplbackend.evaluation.metrics.MetricsAccumulator
 import de.mertendieckmann.griplbackend.evaluation.service.Evaluator
 import de.mertendieckmann.griplbackend.evaluation.service.RagasEvaluationService
 import de.mertendieckmann.griplbackend.model.dto.*
+import de.mertendieckmann.griplbackend.evaluation.text.*
+import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
 import de.mertendieckmann.griplbackend.model.evaluation.EvaluationMetrics
+import de.mertendieckmann.griplbackend.model.evaluation.TextMetrics
 import de.mertendieckmann.griplbackend.model.evaluation.EvaluationOutcome
 import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
@@ -70,7 +73,10 @@ class EvaluationRunner(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome = try {
-        evaluateEntryOrFailFast(entry, evaluationRequest)
+        when (evaluationRequest.modality) {
+            EvaluationModality.BPMN -> evaluateEntryOrFailFast(entry, evaluationRequest)
+            EvaluationModality.TEXT -> evaluateTextEntryOrFailFast(entry, evaluationRequest)
+        }
     } catch (e: Exception) {
         EvaluationOutcome.Error(
             EvaluationReportError(
@@ -82,6 +88,90 @@ class EvaluationRunner(
         )
     }
 
+    private fun ragContextMissingError(entry: EvaluationData, evaluationRequest: EvaluationRequest) =
+        EvaluationOutcome.Error(
+            EvaluationReportError(
+                testCaseId = entry.id,
+                datasetId = entry.datasetId,
+                testCaseName = entry.name ?: "Test Case ${entry.id}",
+                errorMessage = "RAG evaluation (evaluateRag=true) was requested, but endpoint " +
+                    "'${evaluationRequest.evaluationEndpoint}' returned no RAG context — the endpoint " +
+                    "does not support RAG (e.g. baseline) or useRag is false. " +
+                    "Disable 'Evaluate RAG Quality' or use a RAG-capable endpoint with useRag=true."
+            )
+        )
+
+    /**
+     * Text modality: analyzes the process text and scores the extracted activities against the text labels by position
+     * (see [scoreText]). The main metrics use partial matching, strict matching is reported alongside.
+     */
+    private suspend fun evaluateTextEntryOrFailFast(
+        entry: EvaluationData,
+        evaluationRequest: EvaluationRequest
+    ): EvaluationOutcome {
+        val processText = requireNotNull(entry.processText) { "Test case ${entry.id} has no process text" }
+        val actualResult = evaluator.evaluateText(processText, evaluationRequest)
+        val response = actualResult.analysisResponse
+
+        if (evaluationRequest.evaluateRag && response.ragPromptContext == null) {
+            return ragContextMissingError(entry, evaluationRequest)
+        }
+
+        val predictions = textPredictions(response)
+        val partial = scoreText(processText, entry.textLabels, predictions, MatchMode.PARTIAL)
+        val strict = scoreText(processText, entry.textLabels, predictions, MatchMode.STRICT)
+        val textResult = buildTextTestCaseResult(processText, entry.textLabels, response, partial, strict)
+
+        val ragMetrics: RagMetrics? = if (evaluationRequest.evaluateRag && response.criticalElements.isNotEmpty()) {
+            ragasEvaluationService.scoreTestCase(response, textBpmnElements(response))
+        } else {
+            if (evaluationRequest.evaluateRag) {
+                log.info { "Skipping RAGAS evaluation for ${entry.id}: LLM returned no critical activities, nothing to score faithfulness against" }
+            }
+            null
+        }
+
+        // Text consists of activities only, so the per-type breakdown has a single category
+        val counts = ElementTypeCounts(partial.truePositives, partial.falsePositives, partial.falseNegatives, partial.trueNegatives)
+        val perElementType = mapOf(ElementCategory.ACTIVITY.key to counts)
+
+        val metrics = EvaluationMetrics(
+            truePositives = partial.truePositives,
+            falsePositives = partial.falsePositives,
+            falseNegatives = partial.falseNegatives,
+            trueNegatives = partial.trueNegatives,
+            // Like for BPMN: passed when the critical activities were found exactly, without misses or false alarms
+            isSuccessful = partial.falsePositives == 0 && partial.falseNegatives == 0,
+            amountOfRetries = actualResult.amountOfRetries,
+            ragMetrics = ragMetrics,
+            perElementType = perElementType,
+            textMetrics = TextMetrics.from(partial, strict)
+        )
+
+        val testCaseReport = TestCaseReport(
+            testCaseId = entry.id,
+            testCaseName = entry.name,
+            datasetId = entry.datasetId,
+            imageSrc = null,
+            correctActivityIds = partial.truePositiveLabelIds,
+            falsePositiveIds = falsePositivePredictionIds(partial),
+            falseNegativeIds = partial.falseNegativeLabelIds.keys.toList(),
+            expectedNamesWithIds = entry.textLabels.filter { it.isCritical && it.id !in partial.ignoredLabelIds }
+                .sortedBy { it.start }
+                .map { "\"${it.text}\" (${it.id})" },
+            actualNamesWithIds = response.criticalElements.map { "${it.name ?: it.id} (${it.id})" },
+            isSuccessful = metrics.isSuccessful,
+            result = actualResult.expectedValues,
+            amountOfRetries = actualResult.amountOfRetries,
+            perElementType = perElementType,
+            ragMetrics = ragMetrics,
+            ragPromptContext = response.ragPromptContext,
+            textResult = textResult
+        )
+
+        return EvaluationOutcome.Success(testCaseReport, metrics)
+    }
+
     private suspend fun evaluateEntryOrFailFast(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
@@ -90,17 +180,7 @@ class EvaluationRunner(
         val actualResult = evaluator.evaluate(bpmnXml, evaluationRequest)
 
         if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragPromptContext == null) {
-            return EvaluationOutcome.Error(
-                EvaluationReportError(
-                    testCaseId = entry.id,
-                    datasetId = entry.datasetId,
-                    testCaseName = entry.name ?: "Test Case ${entry.id}",
-                    errorMessage = "RAG evaluation (evaluateRag=true) was requested, but endpoint " +
-                        "'${evaluationRequest.evaluationEndpoint}' returned no RAG context — the endpoint " +
-                        "does not support RAG (e.g. baseline) or useRag is false. " +
-                        "Disable 'Evaluate RAG Quality' or use a RAG-capable endpoint with useRag=true."
-                )
-            )
+            return ragContextMissingError(entry, evaluationRequest)
         }
 
         val bpmnModel = parseBpmn(bpmnXml)

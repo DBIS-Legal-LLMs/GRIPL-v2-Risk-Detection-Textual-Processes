@@ -4,8 +4,11 @@ import de.mertendieckmann.griplbackend.evaluation.ElementCategory
 import de.mertendieckmann.griplbackend.model.dto.ElementTypeSummary
 import de.mertendieckmann.griplbackend.model.dto.EvaluationReportSummary
 import de.mertendieckmann.griplbackend.model.dto.RagSummaryMetrics
+import de.mertendieckmann.griplbackend.model.dto.TextStrictResult
+import de.mertendieckmann.griplbackend.model.dto.TextSummaryMetrics
 import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
 import de.mertendieckmann.griplbackend.model.evaluation.EvaluationMetrics
+import de.mertendieckmann.griplbackend.model.evaluation.TextMetrics
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -23,6 +26,8 @@ class MetricsAccumulator {
     private var totalFalseNegatives: Int = 0
     private var totalTrueNegatives: Int = 0
     private val perElementTypeTotals = mutableMapOf<String, ElementTypeCounts>()
+    private var textTotals: TextMetrics? = null
+    private var textTestCases: Int = 0
 
     // RAG metric sums + counts (per test case mean values)
     private var faithfulnessSum: Double = 0.0
@@ -43,6 +48,11 @@ class MetricsAccumulator {
         amountOfRetries += metrics.amountOfRetries ?: 0
         metrics.perElementType.forEach { (category, counts) ->
             perElementTypeTotals[category] = (perElementTypeTotals[category] ?: ElementTypeCounts()) + counts
+        }
+
+        metrics.textMetrics?.let { text ->
+            textTotals = (textTotals ?: TextMetrics()) + text
+            textTestCases++
         }
 
         metrics.ragMetrics?.let { rag ->
@@ -73,6 +83,39 @@ class MetricsAccumulator {
         val totalCount = tp + fp + fn + tn
         val accuracy = if (totalCount > 0) (tp + tn).toDouble() / totalCount else 0.0
         return DerivedMetrics(precision, recall, f1Score, accuracy)
+    }
+
+    private fun ratio(numerator: Number, denominator: Number): Double =
+        if (denominator.toDouble() > 0) numerator.toDouble() / denominator.toDouble() else 0.0
+
+    private fun toTextSummary(t: TextMetrics): TextSummaryMetrics {
+        val extractionPrecision = ratio(t.matchedCount, t.predictedCount)
+        val extractionRecall = ratio(t.matchedCount, t.labelCount)
+        val strict = deriveMetrics(t.strict.truePositives, t.strict.falsePositives, t.strict.falseNegatives, t.strict.trueNegatives)
+        return TextSummaryMetrics(
+            evaluatedTestCases = textTestCases,
+            labelCount = t.labelCount,
+            ignoredLabelCount = t.ignoredLabelCount,
+            extractionPrecision = extractionPrecision,
+            extractionRecall = extractionRecall,
+            extractionF1 = if (extractionPrecision + extractionRecall > 0) {
+                2 * extractionPrecision * extractionRecall / (extractionPrecision + extractionRecall)
+            } else 0.0,
+            localizationRate = ratio(t.localizedCount, t.predictedCount),
+            meanIou = ratio(t.iouSum, t.matchedCount),
+            falseNegativesByExtraction = t.falseNegativesByExtraction,
+            falseNegativesByClassification = t.falseNegativesByClassification,
+            strict = TextStrictResult(
+                truePositives = t.strict.truePositives,
+                falsePositives = t.strict.falsePositives,
+                falseNegatives = t.strict.falseNegatives,
+                trueNegatives = t.strict.trueNegatives,
+                precision = strict.precision,
+                recall = strict.recall,
+                f1Score = strict.f1Score,
+                accuracy = strict.accuracy
+            )
+        )
     }
 
     fun toSummary(): EvaluationReportSummary {
@@ -128,7 +171,8 @@ class MetricsAccumulator {
             totalFalseNegatives = totalFalseNegatives,
             totalTrueNegatives = totalTrueNegatives,
             ragMetrics = ragSummary,
-            perElementType = perElementTypeSummary
+            perElementType = perElementTypeSummary,
+            textMetrics = textTotals?.let { toTextSummary(it) }
         )
     }
 }

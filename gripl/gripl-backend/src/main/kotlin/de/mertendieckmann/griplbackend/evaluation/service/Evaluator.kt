@@ -25,4 +25,10 @@ interface Evaluator {
      */
     @Throws(Exception::class)
     suspend fun evaluate(bpmnXml: String, evaluationRequest: EvaluationRequest): EvaluationCallResult
+
+    /**
+     * Evaluates the given textual process description with the text analysis matching the request's endpoint.
+     */
+    @Throws(Exception::class)
+    suspend fun evaluateText(processText: String, evaluationRequest: EvaluationRequest): EvaluationCallResult
 }

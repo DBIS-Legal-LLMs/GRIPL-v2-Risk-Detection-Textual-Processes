@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.model.dto
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
@@ -71,7 +72,8 @@ data class TestCaseReport(
     val testCaseId: Long,
     val testCaseName: String? = null,
     val datasetId: Long? = null,
-    val imageSrc: String,
+    /** SVG preview of the BPMN model with the result marked; null for text test cases (see [textResult]). */
+    val imageSrc: String?,
     val correctActivityIds: List<String>,
     val falsePositiveIds: List<String>,
     val falseNegativeIds: List<String>,
@@ -83,7 +85,13 @@ data class TestCaseReport(
     val ragMetrics: RagMetrics? = null,
     val ragPromptContext: List<String>? = null,
     /** Confusion counts of this test case broken down by element category. */
-    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap(),
+    /**
+     * Text modality only: text, labels and predictions with their outcomes. For text test cases [correctActivityIds]
+     * and [falseNegativeIds] hold label ids, [falsePositiveIds] the ids of the predictions that caused a false positive.
+     */
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val textResult: TextTestCaseResult? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
@@ -99,7 +107,7 @@ data class TestCaseReport(
 
         return """
             |## Test Case $testCaseId${if (testCaseName != null) " - $testCaseName" else ""}
-            |<img src="$imageSrc" alt="Test Case BPMN XML" />
+            |${imageSrc?.let { "<img src=\"$it\" alt=\"Test Case BPMN XML\" />" } ?: "Modality: Text"}
             |
             |- Amount of Correct Activities: ${correctActivityIds.size}
             |- Amount of False Positives: ${falsePositiveIds.size}
@@ -113,7 +121,7 @@ data class TestCaseReport(
             |- **False Negatives:** ${if (falseNegativeIds.isEmpty()) "None" else falseNegativeIds.joinToString(", ") { id -> expectedNamesWithIds.find { it.contains(id) } ?: id }}
             |
             |- **Amount of Retries:** ${amountOfRetries ?: "N/A"}
-            |$ragBlock
+            |$ragBlock${textResult?.let { textResultMarkdown(it) } ?: ""}
             |
             |<details>
             |<summary><h3>Reasoning of the LLM</h3></summary>
@@ -162,7 +170,10 @@ data class EvaluationReportSummary(
     val totalTrueNegatives: Int,
     val ragMetrics: RagSummaryMetrics? = null,
     /** Metrics broken down by element category, keyed by category key (activity, event, ...). */
-    val perElementType: Map<String, ElementTypeSummary> = emptyMap()
+    val perElementType: Map<String, ElementTypeSummary> = emptyMap(),
+    /** Text modality only: extraction metrics and the metrics with strict matching. */
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val textMetrics: TextSummaryMetrics? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
@@ -206,7 +217,7 @@ data class EvaluationReportSummary(
             |False Negatives: $totalFalseNegatives
             |True Negatives: $totalTrueNegatives
             |$perTypeBlock
-            |$ragBlock
+            |$ragBlock${textMetrics?.let { textSummaryMarkdown(it) } ?: ""}
         """.trimMargin()
     }
 
@@ -243,3 +254,43 @@ data class EvaluationReportError(
         """.trimMargin()
     }
 }
+
+private fun f3(value: Double) = "%.3f".format(value)
+
+private fun textResultMarkdown(r: TextTestCaseResult): String = buildString {
+    appendLine()
+    appendLine()
+    appendLine("### Text Scoring (partial matching)")
+    appendLine("- **Extraction P/R/F1:** ${f3(r.extractionPrecision)} / ${f3(r.extractionRecall)} / ${f3(r.extractionF1)}")
+    appendLine("- **Localized Quotes:** ${f3(r.localizationRate)}, **Mean IoU:** ${f3(r.meanIou)}")
+    appendLine("- **False Negatives by Extraction / Classification:** ${r.falseNegativesByExtraction} / ${r.falseNegativesByClassification}")
+    appendLine("- **Strict (IoU >= 0.5):** TP ${r.strict.truePositives}, FP ${r.strict.falsePositives}, FN ${r.strict.falseNegatives}, TN ${r.strict.trueNegatives}")
+    appendLine()
+    appendLine("| Label | Critical | Outcome | Strict | Prediction | IoU |")
+    appendLine("|-------|----------|---------|--------|------------|-----|")
+    r.labels.forEach { l ->
+        val outcome = l.outcome.name + (l.falseNegativeCause?.let { " (${it.name.lowercase()})" } ?: "")
+        appendLine("| ${l.text.replace(Regex("\\s+"), " ").replace("|", "/")} | ${if (l.isCritical) "yes" else "no"} | $outcome | ${l.strictOutcome} | ${l.matchedPredictionId ?: "-"} | ${l.iou?.let { f3(it) } ?: "-"} |")
+    }
+    val unmatched = r.predictions.filter { it.matchedLabelId == null }
+    if (unmatched.isNotEmpty()) {
+        appendLine()
+        appendLine("Unmatched predictions: " + unmatched.joinToString(", ") {
+            "${it.id} (${if (it.isCritical) "critical" else "non-critical"}, ${if (it.start == null) "not located" else "outside all labels"})"
+        })
+    }
+}.trimEnd()
+
+private fun textSummaryMarkdown(t: TextSummaryMetrics): String = buildString {
+    appendLine()
+    appendLine()
+    appendLine("### Text Scoring — ${t.evaluatedTestCases} test case(s), ${t.labelCount} labels" +
+        (if (t.ignoredLabelCount > 0) " (${t.ignoredLabelCount} orphaned labels ignored)" else ""))
+    appendLine("Extraction Precision / Recall / F1: ${f3(t.extractionPrecision)} / ${f3(t.extractionRecall)} / ${f3(t.extractionF1)}")
+    appendLine("Localized Quotes: ${f3(t.localizationRate)}")
+    appendLine("Mean IoU: ${f3(t.meanIou)}")
+    appendLine("False Negatives by Extraction / Classification: ${t.falseNegativesByExtraction} / ${t.falseNegativesByClassification}")
+    appendLine("Strict Matching (IoU >= 0.5): Precision ${f3(t.strict.precision)}, Recall ${f3(t.strict.recall)}, " +
+        "F1 ${f3(t.strict.f1Score)}, Accuracy ${f3(t.strict.accuracy)} " +
+        "(TP ${t.strict.truePositives}, FP ${t.strict.falsePositives}, FN ${t.strict.falseNegatives}, TN ${t.strict.trueNegatives})")
+}.trimEnd()

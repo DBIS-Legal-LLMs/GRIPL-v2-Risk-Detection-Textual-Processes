@@ -9,7 +9,9 @@ data class EvaluationMetrics(
     val amountOfRetries: Int? = null,
     val ragMetrics: RagMetrics? = null,
     /** Confusion counts broken down by element category (activity, event, gateway, dataObject). */
-    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap(),
+    /** Text modality only: extraction counts and strict-matching counts. */
+    val textMetrics: TextMetrics? = null
 )
 
 /** Confusion-matrix counts for one element category. */

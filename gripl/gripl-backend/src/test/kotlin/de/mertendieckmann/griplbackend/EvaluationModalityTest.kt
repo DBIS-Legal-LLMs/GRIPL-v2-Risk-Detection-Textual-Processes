@@ -56,10 +56,10 @@ class EvaluationModalityTest {
 
     private fun request(modalities: List<EvaluationModality>? = null, pairedOnly: Boolean = false) =
         if (modalities == null) {
-            MultiEvaluationRequest(defaultEvaluationEndpoint = "/e", models = listOf(ModelRunConfig("A"), ModelRunConfig("B")),
+            MultiEvaluationRequest(defaultEvaluationEndpoint = ENDPOINT, models = listOf(ModelRunConfig("A"), ModelRunConfig("B")),
                 seed = 7, datasets = listOf(1), pairedOnly = pairedOnly)
         } else {
-            MultiEvaluationRequest(defaultEvaluationEndpoint = "/e", models = listOf(ModelRunConfig("A"), ModelRunConfig("B")),
+            MultiEvaluationRequest(defaultEvaluationEndpoint = ENDPOINT, models = listOf(ModelRunConfig("A"), ModelRunConfig("B")),
                 seed = 7, datasets = listOf(1), modalities = modalities, pairedOnly = pairedOnly)
         }
 
@@ -90,8 +90,32 @@ class EvaluationModalityTest {
     }
 
     @Test
-    fun `text modality is rejected until it is wired in`() {
-        val error = assertThrows<IllegalArgumentException> { Fixture().run(request(listOf(BPMN, TEXT))) }
-        assertTrue(error.message!!.contains("TEXT"))
+    fun `comparing modalities suffixes the labels and evaluates paired test cases`() {
+        val fixture = Fixture()
+        val envelopes = fixture.run(request(listOf(BPMN, TEXT), pairedOnly = true))
+
+        val metadata = envelopes.first().report as EvaluationMetadataReport
+        assertEquals(listOf("A [BPMN]", "B [BPMN]", "A [TEXT]", "B [TEXT]"), metadata.modelLabels)
+        assertEquals(mapOf(BPMN to 1, TEXT to 1), metadata.totalTestCasesByModality)
+        assertEquals(1, metadata.totalTestCases)
+        assertTrue(metadata.toMarkdown().contains("Modalities"))
+
+        assertEquals(listOf(BPMN, BPMN, TEXT, TEXT), fixture.requests.map { it.modality })
+        assertTrue(fixture.requests.all { it.requiredModalities == setOf(BPMN, TEXT) })
+        assertEquals(listOf("A [BPMN]", "B [BPMN]", "A [TEXT]", "B [TEXT]"), envelopes.drop(1).map { it.modelLabel })
+        assertEquals(listOf(BPMN, BPMN, TEXT, TEXT), envelopes.drop(1).map { it.modality })
+    }
+
+    @Test
+    fun `text modality rejects endpoints without a text pipeline before the run starts`() {
+        val fixture = Fixture()
+        val baseline = request(listOf(TEXT)).copy(models = listOf(ModelRunConfig("A", evaluationEndpoint = "/gdpr/analysis/baseline")))
+        val error = assertThrows<IllegalArgumentException> { fixture.run(baseline) }
+        assertTrue(error.message!!.contains("baseline"))
+        assertTrue(fixture.requests.isEmpty())
+    }
+
+    private companion object {
+        const val ENDPOINT = "/gdpr/analysis/prompt-engineering"
     }
 }

@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.evaluation
 
+import de.mertendieckmann.griplbackend.evaluation.text.textAnalysisEndpointFor
 import de.mertendieckmann.griplbackend.model.dto.EvaluationMetadataReport
 import de.mertendieckmann.griplbackend.model.dto.EvaluationModality
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
@@ -25,11 +26,16 @@ class MultiEvaluationRunner(
     fun runAll(request: MultiEvaluationRequest): Flow<ModelReportEnvelope> = flow {
         require(request.models.isNotEmpty()) { "models must not be empty" }
         require(request.modalities.isNotEmpty()) { "modalities must not be empty" }
-        require(request.modalities.all { it in SUPPORTED_MODALITIES }) {
-            "Unsupported modalities ${request.modalities - SUPPORTED_MODALITIES}; supported: $SUPPORTED_MODALITIES"
-        }
 
         val modalities = request.modalities.distinct()
+        if (EvaluationModality.TEXT in modalities) {
+            // Fail before the run starts: the text pipeline only exists for the prompt-engineering analysis
+            request.models.forEach { textAnalysisEndpointFor(it.evaluationEndpoint ?: request.defaultEvaluationEndpoint) }
+            if (EvaluationModality.BPMN in modalities && !request.activitiesOnly) {
+                log.warn { "Comparing BPMN with TEXT without activitiesOnly: BPMN also scores events, gateways and data " +
+                    "objects, while text consists of activities only - set activitiesOnly for a fair comparison" }
+            }
+        }
         val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
         val repetitions = request.repetitions.coerceAtLeast(1)
         emit(ModelReportEnvelope("", createMetadata(request, modalities, baseSeed, repetitions), 1))
@@ -120,10 +126,5 @@ class MultiEvaluationRunner(
         val raw = ByteBuffer.wrap(hash, 0, 4).order(ByteOrder.BIG_ENDIAN).int
         val position = raw and 0x7fffffff
         return if (position == 0) 1 else position
-    }
-
-    companion object {
-        /** Modalities the evaluation can score; TEXT is added once the text modality is wired into the runner. */
-        val SUPPORTED_MODALITIES = setOf(EvaluationModality.BPMN)
     }
 }
