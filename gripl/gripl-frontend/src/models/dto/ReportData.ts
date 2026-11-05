@@ -1,3 +1,5 @@
+import {EvaluationModality} from "@/models/dto/MultiEvaluationRequest";
+
 export interface EvaluationMetadataReport {
     type: "metadata";
     modelLabels: string[],
@@ -10,6 +12,10 @@ export interface EvaluationMetadataReport {
     seed: number;
     totalRepetitions?: number;
     activitiesOnly?: boolean;
+    modalities?: EvaluationModality[];
+    pairedOnly?: boolean;
+    // Evaluated test cases per modality; totalTestCases counts the distinct test cases over all modalities
+    totalTestCasesByModality?: Partial<Record<EvaluationModality, number>>;
     markdown: string;
 }
 

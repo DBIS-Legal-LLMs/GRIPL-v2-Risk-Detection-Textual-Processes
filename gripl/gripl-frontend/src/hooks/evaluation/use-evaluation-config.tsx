@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import fetchAnalysisEndpoints from "@/actions/analysis-endpoints";
 import { Dataset } from "@/models/dto/Dataset";
-import { ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
+import { EvaluationModality, ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
 import {EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
-import {cryptoRandomId, normalize} from "@/lib/evaluation-config-utils";
+import {cryptoRandomId, isTextCapableEndpoint, normalize} from "@/lib/evaluation-config-utils";
 
 export function newModelRow(index: number): ModelRowState {
     return {
@@ -47,6 +47,10 @@ export function useEvaluationConfig(
 
     // Evaluation scope: score activities only vs. all BPMN elements
     const [activitiesOnly, setActivitiesOnly] = useState<boolean>(false);
+
+    // Modalities: BPMN model and/or textual process description
+    const [modalities, setModalities] = useState<EvaluationModality[]>(["BPMN"]);
+    const [pairedOnly, setPairedOnly] = useState<boolean>(false);
 
     useEffect(() => {
         fetchAnalysisEndpoints().then((eps) => {
@@ -98,10 +102,28 @@ export function useEvaluationConfig(
             ragMode,
             evaluateRag: useRag && evaluateRag,
             activitiesOnly,
+            modalities,
+            pairedOnly,
         };
 
         onMultiConfigChanged(multi);
-    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, onMultiConfigChanged]);
+    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, modalities, pairedOnly, onMultiConfigChanged]);
+
+    // Models the backend would reject for the text modality (no text pipeline for their endpoint, e.g. the baseline)
+    const textIncompatibleModels = useMemo(() => {
+        if (!modalities.includes("TEXT")) return [];
+        return models
+            .filter((model) => {
+                const endpoint =
+                    model.endpointChoice === "default"
+                        ? effectiveDefaultEndpoint
+                        : model.endpointChoice === "preset"
+                            ? model.selectedPresetEndpoint
+                            : model.customEndpoint;
+                return !isTextCapableEndpoint(endpoint);
+            })
+            .map((model) => model.label.trim() || "Model");
+    }, [modalities, models, effectiveDefaultEndpoint]);
 
     function addModel() {
         setModels((prev) => [...prev, newModelRow(prev.length + 1)]);
@@ -147,6 +169,9 @@ export function useEvaluationConfig(
         ragMode,
         evaluateRag,
         activitiesOnly,
+        modalities,
+        pairedOnly,
+        textIncompatibleModels,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -160,6 +185,8 @@ export function useEvaluationConfig(
         setRagMode,
         setEvaluateRag,
         setActivitiesOnly,
+        setModalities,
+        setPairedOnly,
         addModel,
         removeModel,
         duplicateModel,

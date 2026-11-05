@@ -66,3 +66,11 @@ export function pruneNulls<T>(obj: T): T {
     }
     return obj as T;
 }
+
+const PROMPT_ENGINEERING_ENDPOINT = "/gdpr/analysis/prompt-engineering";
+
+// The text pipeline exists only for the prompt-engineering analysis; the backend rejects other endpoints
+// (e.g. the baseline) for the text modality before the run starts
+export function isTextCapableEndpoint(endpoint: string | null | undefined): boolean {
+    return !!endpoint && endpoint.trim().replace(/\/+$/, "").endsWith(PROMPT_ENGINEERING_ENDPOINT);
+}

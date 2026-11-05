@@ -33,6 +33,8 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         ragMode: config.ragMode,
         evaluateRag: config.evaluateRag,
         activitiesOnly: config.activitiesOnly,
+        modalities: config.modalities,
+        pairedOnly: config.pairedOnly,
         setDefaultEndpointChoice: (v) => config.setDefaultEndpointChoice(v),
         setDefaultPresetEndpoint: config.setDefaultPresetEndpoint,
         setDefaultCustomEndpoint: config.setDefaultCustomEndpoint,
@@ -45,6 +47,8 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         setRagMode: config.setRagMode,
         setEvaluateRag: config.setEvaluateRag,
         setActivitiesOnly: config.setActivitiesOnly,
+        setModalities: config.setModalities,
+        setPairedOnly: config.setPairedOnly,
     });
 
     return (
@@ -80,6 +84,9 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                         ragMode={config.ragMode}
                         evaluateRag={config.evaluateRag}
                         activitiesOnly={config.activitiesOnly}
+                        modalities={config.modalities}
+                        pairedOnly={config.pairedOnly}
+                        textIncompatibleModels={config.textIncompatibleModels}
                         setDefaultEndpointChoice={config.setDefaultEndpointChoice}
                         setDefaultPresetEndpoint={config.setDefaultPresetEndpoint}
                         setDefaultCustomEndpoint={config.setDefaultCustomEndpoint}
@@ -90,6 +97,8 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                         setRagMode={config.setRagMode}
                         setEvaluateRag={config.setEvaluateRag}
                         setActivitiesOnly={config.setActivitiesOnly}
+                        setModalities={config.setModalities}
+                        setPairedOnly={config.setPairedOnly}
                     />
 
                     <EvaluationConfigDatasetSettings

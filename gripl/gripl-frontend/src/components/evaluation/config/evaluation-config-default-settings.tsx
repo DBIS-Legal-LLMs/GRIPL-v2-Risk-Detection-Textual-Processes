@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {EndpointChoice} from "@/models/evaluation/Config";
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
+import {EVALUATION_MODALITIES, EvaluationModality} from "@/models/dto/MultiEvaluationRequest";
+import {AlertTriangle} from "lucide-react";
 
 interface EvaluationConfigDefaultSettingsProps {
     availableEvaluationEndpoints: AnalysisEndpoint[];
@@ -21,6 +23,10 @@ interface EvaluationConfigDefaultSettingsProps {
     ragMode: string;
     evaluateRag: boolean;
     activitiesOnly: boolean;
+    modalities: EvaluationModality[];
+    pairedOnly: boolean;
+    // Models the backend would reject for the text modality (their endpoint has no text pipeline)
+    textIncompatibleModels: string[];
     setDefaultEndpointChoice: (endpoint: EndpointChoice) => void;
     setDefaultPresetEndpoint: (endpoint: string) => void;
     setDefaultCustomEndpoint: (endpoint: string) => void;
@@ -31,7 +37,20 @@ interface EvaluationConfigDefaultSettingsProps {
     setRagMode: (v: string) => void;
     setEvaluateRag: (v: boolean) => void;
     setActivitiesOnly: (v: boolean) => void;
+    setModalities: (v: EvaluationModality[]) => void;
+    setPairedOnly: (v: boolean) => void;
 }
+
+const MODALITY_OPTIONS: Record<EvaluationModality, { label: string; description: string }> = {
+    BPMN: {
+        label: "BPMN Model",
+        description: "Analyze the BPMN model and score it against its labeled elements.",
+    },
+    TEXT: {
+        label: "Text Description",
+        description: "Analyze the textual process description and score it against its labeled passages.",
+    },
+};
 
 const RAG_MODES = [
     { value: "hybrid", label: "Hybrid (recommended)" },
@@ -53,6 +72,9 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
         ragMode,
         evaluateRag,
         activitiesOnly,
+        modalities,
+        pairedOnly,
+        textIncompatibleModels,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -63,7 +85,17 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
         setRagMode,
         setEvaluateRag,
         setActivitiesOnly,
+        setModalities,
+        setPairedOnly,
     } = props;
+
+    // Keeps the canonical order (BPMN, TEXT) and at least one modality selected
+    function toggleModality(modality: EvaluationModality, checked: boolean) {
+        const next = EVALUATION_MODALITIES.filter((m) => (m === modality ? checked : modalities.includes(m)));
+        if (next.length > 0) setModalities(next);
+    }
+
+    const comparesModalities = modalities.length > 1;
 
     return (
         <Card>
@@ -136,6 +168,76 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                            onChange={(e) => setSeed(parseInt(e.target.value))}
                            className="w-full"/>
                     <p className="text-sm text-muted-foreground">Warning: Not all models support a seed, but it will be used for models that support them.</p>
+                </div>
+
+                <Separator />
+
+                {/* ── Modalities ────────────────────────────────────── */}
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-sm font-medium">Modalities</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Which representation of each process is analyzed. With several modalities, every model
+                            is evaluated once per modality and appears as &quot;Model [BPMN]&quot; / &quot;Model [TEXT]&quot;.
+                        </p>
+                    </div>
+
+                    {EVALUATION_MODALITIES.map((modality) => {
+                        const checked = modalities.includes(modality);
+                        return (
+                            <div key={modality} className="flex items-center justify-between">
+                                <div>
+                                    <Label htmlFor={`modality-${modality}-toggle`}>{MODALITY_OPTIONS[modality].label}</Label>
+                                    <p className="text-xs text-muted-foreground">{MODALITY_OPTIONS[modality].description}</p>
+                                </div>
+                                <Switch
+                                    id={`modality-${modality}-toggle`}
+                                    checked={checked}
+                                    // the last selected modality cannot be deselected
+                                    disabled={checked && modalities.length === 1}
+                                    onCheckedChange={(value) => toggleModality(modality, value)}
+                                />
+                            </div>
+                        );
+                    })}
+
+                    {comparesModalities && (
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label htmlFor="paired-only-toggle">Paired Test Cases Only</Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Evaluate only test cases with both a BPMN model and a labeled text, so the
+                                    modalities are compared on exactly the same processes.
+                                </p>
+                            </div>
+                            <Switch
+                                id="paired-only-toggle"
+                                checked={pairedOnly}
+                                onCheckedChange={setPairedOnly}
+                            />
+                        </div>
+                    )}
+
+                    {comparesModalities && !activitiesOnly && (
+                        <div className="flex gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500"/>
+                            <p>
+                                Text consists of activities only, while BPMN also scores events, gateways and data
+                                objects. Enable &quot;Evaluate Activities Only&quot; for a fair comparison.
+                            </p>
+                        </div>
+                    )}
+
+                    {textIncompatibleModels.length > 0 && (
+                        <div className="flex gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive"/>
+                            <p>
+                                The text modality is only available for the prompt-engineering analysis. The run will
+                                be rejected, as these models use another endpoint (e.g. the baseline):{" "}
+                                {textIncompatibleModels.join(", ")}.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <Separator />

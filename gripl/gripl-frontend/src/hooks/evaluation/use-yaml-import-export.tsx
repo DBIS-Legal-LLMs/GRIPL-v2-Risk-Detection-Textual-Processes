@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { dump as yamlDump, load as yamlLoad } from "js-yaml";
-import { MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
+import { EVALUATION_MODALITIES, EvaluationModality, MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
 import {ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, findPreset, normalize, pruneNulls} from "@/lib/evaluation-config-utils";
 import {useToast} from "@/components/ui/toast";
@@ -20,6 +20,8 @@ export function useYamlImportExport(props: {
     ragMode: string;
     evaluateRag: boolean;
     activitiesOnly: boolean;
+    modalities: EvaluationModality[];
+    pairedOnly: boolean;
     setDefaultEndpointChoice: (v: "preset" | "custom") => void;
     setDefaultPresetEndpoint: (v: string) => void;
     setDefaultCustomEndpoint: (v: string) => void;
@@ -32,6 +34,8 @@ export function useYamlImportExport(props: {
     setRagMode: (v: string) => void;
     setEvaluateRag: (v: boolean) => void;
     setActivitiesOnly: (v: boolean) => void;
+    setModalities: (v: EvaluationModality[]) => void;
+    setPairedOnly: (v: boolean) => void;
 }) {
     const {
         availableEvaluationEndpoints,
@@ -45,6 +49,8 @@ export function useYamlImportExport(props: {
         ragMode,
         evaluateRag,
         activitiesOnly,
+        modalities,
+        pairedOnly,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -57,6 +63,8 @@ export function useYamlImportExport(props: {
         setRagMode,
         setEvaluateRag,
         setActivitiesOnly,
+        setModalities,
+        setPairedOnly,
     } = props;
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -118,6 +126,13 @@ export function useYamlImportExport(props: {
         if (typeof cfg?.ragMode === "string" && cfg.ragMode) setRagMode(cfg.ragMode);
         if (typeof cfg?.evaluateRag === "boolean") setEvaluateRag(cfg.evaluateRag);
         if (typeof cfg?.activitiesOnly === "boolean") setActivitiesOnly(cfg.activitiesOnly);
+
+        // Missing in older configs: the backend then evaluates BPMN only, so the form follows that default
+        const importedModalities: EvaluationModality[] = Array.isArray(cfg?.modalities)
+            ? EVALUATION_MODALITIES.filter((m) => cfg.modalities.some((v: any) => String(v).toUpperCase() === m))
+            : [];
+        setModalities(importedModalities.length > 0 ? importedModalities : ["BPMN"]);
+        setPairedOnly(cfg?.pairedOnly === true);
 
         if (modelItems.length > 0) {
             const next: ModelRowState[] = modelItems.map((model: any, idx: number) => {
@@ -202,6 +217,8 @@ export function useYamlImportExport(props: {
             ragMode,
             evaluateRag: useRag && evaluateRag,
             activitiesOnly,
+            modalities,
+            pairedOnly,
         };
     }
 

@@ -28,11 +28,13 @@ import {ColorProvider, useColors} from "@/components/evaluation/charts/common/co
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
 import {useToast} from "@/components/ui/toast";
 import {toErrorMessage} from "@/lib/http-error";
+import {EvaluationModality} from "@/models/dto/MultiEvaluationRequest";
 
 type ModelReportEnvelope = {
     modelLabel: string;
     report: EvaluationReport;
     runNumber: number;
+    modality?: EvaluationModality;
 };
 
 interface EvaluationPageProps {
