@@ -6,6 +6,7 @@ import type ApexCharts from "apexcharts"
 import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 import {useEffect, useState} from "react";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
@@ -14,6 +15,7 @@ interface ResultsPerModelStackedProps {
 }
 
 export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStackedProps) {
+    const chartTheme = useChartTheme()
     const [isClient, setIsClient] = useState(false)
     const chartId = "results-per-model-stacked-chart"
 
@@ -38,6 +40,8 @@ export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStack
 
     const options: ApexCharts.ApexOptions = {
         chart: {
+            foreColor: chartTheme.foreColor,
+            background: "transparent",
             id: chartId,
             type: "bar",
             stacked: true,
@@ -61,6 +65,7 @@ export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStack
         dataLabels: {
             enabled: true,
         },
+        grid: { borderColor: chartTheme.gridColor },
         xaxis: {
             categories: reportSummaries.map((r) => r.label),
             labels: {
@@ -84,6 +89,7 @@ export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStack
             horizontalAlign: "center",
         },
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             y: {
                 formatter: (val) => `${val} tests`,
             },

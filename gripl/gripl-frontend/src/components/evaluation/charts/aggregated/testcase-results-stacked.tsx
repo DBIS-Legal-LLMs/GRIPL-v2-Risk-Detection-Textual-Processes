@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type ApexCharts from "apexcharts"
 import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluationResult";
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
@@ -15,6 +16,7 @@ interface TestcaseResultsStackedProps {
 }
 
 export default function TestcaseResultsStacked({ aggregatedEvaluationResults, repetisions }: TestcaseResultsStackedProps) {
+    const chartTheme = useChartTheme()
     const [isClient, setIsClient] = useState(false)
     const [customColors, setCustomColors] = useState({
         passed: "#22c55e",
@@ -50,6 +52,8 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
 
     const options: ApexCharts.ApexOptions = {
         chart: {
+            foreColor: chartTheme.foreColor,
+            background: "transparent",
             id: chartId,
             type: "bar",
             height: 500,
@@ -83,7 +87,7 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
                 rotateAlways: true,
                 style: { fontSize: "10px" },
             },
-            axisBorder: { show: true, color: "#000000" },
+            axisBorder: { show: true, color: chartTheme.axisColor },
             axisTicks: { show: true },
         },
         yaxis: {
@@ -92,10 +96,10 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
                 style: { fontSize: "10px", fontWeight: 400 },
             },
             labels: { style: { fontSize: "10px" } },
-            axisBorder: { show: true, color: "#000000" },
+            axisBorder: { show: true, color: chartTheme.axisColor },
         },
         grid: {
-            borderColor: "#e0e0e0",
+            borderColor: chartTheme.gridColor,
             strokeDashArray: 4,
             xaxis: { lines: { show: false } },
             yaxis: { lines: { show: true } },
@@ -108,6 +112,7 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
             },
         },
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             y: {
                 formatter: (val) => val.toFixed(1),
             },

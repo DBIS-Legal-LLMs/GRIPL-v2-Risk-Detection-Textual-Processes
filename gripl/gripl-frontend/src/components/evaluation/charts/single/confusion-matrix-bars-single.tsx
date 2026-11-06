@@ -5,8 +5,10 @@ import React from "react";
 import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import UniversalTooltip from "@/components/evaluation/charts/common/universal-tooltip";
 import ChartContainer from "@/components/evaluation/charts/chart-container";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 export default function ConfusionMatrixBarsSingle({ summary }: { summary: EvaluationReportSummary }) {
+    const chartTheme = useChartTheme();
     const colors = mergeEvalColors(getEvaluationColors);
     const data = [
         { name: "True Positives",  value: summary.totalTruePositives,  color: colors.truePositive },
@@ -18,9 +20,9 @@ export default function ConfusionMatrixBarsSingle({ summary }: { summary: Evalua
     return <ChartContainer title="Confusion Matrix Breakdown">
         <ResponsiveContainer width="100%" height={300}>
             <BarChart data={data} margin={{ top:20, right:30, left:20, bottom:5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-45} textAnchor="end" height={80} />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.rechartsGridColor} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: chartTheme.tickColor }} interval={0} angle={-45} textAnchor="end" height={80} />
+                <YAxis tick={{ fill: chartTheme.tickColor }} />
                 <Tooltip content={<UniversalTooltip />} wrapperStyle={{ zIndex: 100 }} cursor={{ fill: "hsl(var(--card-foreground))", fillOpacity: 0.1 }}/>
                 <Bar dataKey="value" radius={[4,4,0,0]}>
                     {data.map((e,i)=><Cell key={i} fill={e.color} />)}

@@ -6,6 +6,7 @@ import type ApexCharts from "apexcharts"
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import {useEffect, useState} from "react";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
@@ -14,6 +15,7 @@ interface AmountOfRetriesPerModelProps {
 }
 
 export function AmountOfRetriesPerModel({ reportSummaries }: AmountOfRetriesPerModelProps) {
+    const chartTheme = useChartTheme()
 
     const [isClient, setIsClient] = useState(false)
 
@@ -31,6 +33,8 @@ export function AmountOfRetriesPerModel({ reportSummaries }: AmountOfRetriesPerM
 
     const options: ApexCharts.ApexOptions = {
         chart: {
+            foreColor: chartTheme.foreColor,
+            background: "transparent",
             id: chartId,
             type: "bar",
             toolbar: { show: false },
@@ -45,6 +49,7 @@ export function AmountOfRetriesPerModel({ reportSummaries }: AmountOfRetriesPerM
         dataLabels: {
             enabled: true,
         },
+        grid: { borderColor: chartTheme.gridColor },
         xaxis: {
             categories: reportSummaries.map((r) => r.label),
             labels: {
@@ -62,6 +67,7 @@ export function AmountOfRetriesPerModel({ reportSummaries }: AmountOfRetriesPerM
         },
         colors: ["#fb923c"],
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             y: {
                 formatter: (val) => `${val} retries`,
             },

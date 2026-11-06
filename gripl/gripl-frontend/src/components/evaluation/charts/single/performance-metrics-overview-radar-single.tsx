@@ -7,8 +7,10 @@ import React from "react";
 import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import UniversalTooltip from "@/components/evaluation/charts/common/universal-tooltip";
 import ChartContainer from "@/components/evaluation/charts/chart-container";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 export default function PerformanceMetricsOverviewRadarSingle({ summary }: { summary: EvaluationReportSummary }) {
+    const chartTheme = useChartTheme();
     const colors = mergeEvalColors(getEvaluationColors);
     const data = [
         { metric: "Accuracy", value: summary.accuracy * 100, fullMark: 100 },
@@ -20,9 +22,9 @@ export default function PerformanceMetricsOverviewRadarSingle({ summary }: { sum
     return <ChartContainer title="Performance Metrics Overview">
         <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={data}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="metric" />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(v)=>`${v}%`} />
+                <PolarGrid stroke={chartTheme.rechartsGridColor} />
+                <PolarAngleAxis dataKey="metric" tick={{ fill: chartTheme.tickColor }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 12, fill: chartTheme.tickColor }} tickFormatter={(v)=>`${v}%`} />
                 <Radar name="Metrics" dataKey="value" stroke={colors.accuracy} fill={colors.accuracy} fillOpacity={0.3} strokeWidth={2} />
                 <Tooltip content={<UniversalTooltip isPercentage={true}/>} wrapperStyle={{ zIndex: 100 }} />
             </RadarChart>

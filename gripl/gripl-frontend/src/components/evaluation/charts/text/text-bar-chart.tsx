@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type ApexCharts from "apexcharts";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
-import {useTheme} from "next-themes";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 const Chart = dynamic(() => import("react-apexcharts"), {ssr: false});
 
@@ -36,13 +36,10 @@ export default function TextBarChart({
 }: TextBarChartProps) {
     const [isClient, setIsClient] = useState(false);
     useEffect(() => setIsClient(true), []);
-    // Axis and legend text in muted ink that stays readable on the dark surface as well
-    const isDark = useTheme().resolvedTheme === "dark";
-    const textColor = isDark ? "#a1a1aa" : "#52525b";
+    const chartTheme = useChartTheme();
 
     const options: ApexCharts.ApexOptions = {
-        chart: {id: chartId, type: "bar", stacked, toolbar: {show: false}, animations: {enabled: false}, foreColor: textColor, background: "transparent"},
-        theme: {mode: isDark ? "dark" : "light"},
+        chart: {id: chartId, type: "bar", stacked, toolbar: {show: false}, animations: {enabled: false}, foreColor: chartTheme.foreColor, background: "transparent"},
         plotOptions: {
             bar: {
                 horizontal: false,
@@ -66,9 +63,10 @@ export default function TextBarChart({
             title: {text: yTitle, style: {fontSize: "10px", fontWeight: 400}},
             labels: {style: {fontSize: "10px"}, formatter: (v) => v.toFixed(yMax === 1 ? 1 : 0)},
         },
-        grid: {borderColor: isDark ? "#3f3f46" : "#e0e0e0", strokeDashArray: 4},
+        grid: {borderColor: chartTheme.gridColor, strokeDashArray: 4},
         legend: {show: series.length > 1, position: "bottom", horizontalAlign: "center"},
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             shared: true,
             intersect: false,
             y: {

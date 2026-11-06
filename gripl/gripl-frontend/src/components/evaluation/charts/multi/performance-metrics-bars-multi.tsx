@@ -4,6 +4,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import ApexCharts from "react-apexcharts"
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 import {useEffect, useState} from "react";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 export interface EvaluationReportSummary {
     type: "summary"
@@ -28,6 +29,7 @@ interface PerformanceMetricsSideBySideProps {
 }
 
 export function PerformanceMetricsBarsMulti({ reportSummaries }: PerformanceMetricsSideBySideProps) {
+    const chartTheme = useChartTheme()
     const [isClient, setIsClient] = useState(false)
     const chartId = "performance-metrics-chart"
 
@@ -56,6 +58,8 @@ export function PerformanceMetricsBarsMulti({ reportSummaries }: PerformanceMetr
 
     const options: ApexCharts.ApexOptions = {
         chart: {
+            foreColor: chartTheme.foreColor,
+            background: "transparent",
             id: chartId,
             type: "bar",
             toolbar: { show: false },
@@ -78,6 +82,7 @@ export function PerformanceMetricsBarsMulti({ reportSummaries }: PerformanceMetr
             width: 2,
             colors: ["transparent"],
         },
+        grid: { borderColor: chartTheme.gridColor },
         xaxis: {
             categories: reportSummaries.map((report) => report.label),
             labels: {
@@ -104,6 +109,7 @@ export function PerformanceMetricsBarsMulti({ reportSummaries }: PerformanceMetr
             horizontalAlign: "center",
         },
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             y: {
                 formatter: (val) => `${val.toFixed(2)}%`,
             },

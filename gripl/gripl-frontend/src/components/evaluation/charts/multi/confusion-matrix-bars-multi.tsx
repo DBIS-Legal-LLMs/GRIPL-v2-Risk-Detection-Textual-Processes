@@ -5,6 +5,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 import {useEffect, useState} from "react";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
@@ -13,6 +14,7 @@ interface ConfusionMatrixPerModelProps {
 }
 
 export function ConfusionMatrixBarsMulti({ reportSummaries }: ConfusionMatrixPerModelProps) {
+    const chartTheme = useChartTheme()
     const [isClient, setIsClient] = useState(false)
     const chartId = "confusion-matrix-chart"
 
@@ -41,6 +43,8 @@ export function ConfusionMatrixBarsMulti({ reportSummaries }: ConfusionMatrixPer
 
     const options: ApexCharts.ApexOptions = {
         chart: {
+            foreColor: chartTheme.foreColor,
+            background: "transparent",
             id: chartId,
             type: "bar",
             toolbar: { show: false },
@@ -60,6 +64,7 @@ export function ConfusionMatrixBarsMulti({ reportSummaries }: ConfusionMatrixPer
             width: 2,
             colors: ["transparent"],
         },
+        grid: { borderColor: chartTheme.gridColor },
         xaxis: {
             categories: reportSummaries.map((report) => report.label),
             labels: {
@@ -83,6 +88,7 @@ export function ConfusionMatrixBarsMulti({ reportSummaries }: ConfusionMatrixPer
             horizontalAlign: "center",
         },
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             y: {
                 formatter: (val) => `${val}`,
             },

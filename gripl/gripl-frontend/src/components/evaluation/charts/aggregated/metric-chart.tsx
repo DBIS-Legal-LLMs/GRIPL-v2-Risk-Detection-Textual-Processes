@@ -8,6 +8,7 @@ import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluat
 import {getModelColor, useColors} from "@/components/evaluation/charts/common/color-context";
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 import ColorConfigDialog from "@/components/evaluation/charts/common/color-config-dialog";
+import {useChartTheme} from "@/components/evaluation/charts/common/use-chart-theme";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
@@ -28,6 +29,7 @@ interface ModelData {
 }
 
 export default function MetricChart({ title, description, metricKey, stdKey, aggregatedEvaluationResults, xAxisMaxOffset }: MetricChartProps) {
+    const chartTheme = useChartTheme()
     const [isClient, setIsClient] = useState(false)
     const { colors } = useColors()
     const [showColorDialog, setShowColorDialog] = useState(false)
@@ -60,6 +62,8 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
 
     const options: ApexCharts.ApexOptions = {
         chart: {
+            foreColor: chartTheme.foreColor,
+            background: "transparent",
             id: chartId,
             type: "bar",
             height: 100,
@@ -83,7 +87,7 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
             },
             offsetY: 0,
             offsetX: 40,
-            style: { fontSize: "11px", colors: ["#000000"] },
+            style: { fontSize: "11px", colors: [chartTheme.strongColor] },
             background: { enabled: false },
         },
         xaxis: {
@@ -95,7 +99,7 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
                 style: { fontSize: "10px", fontWeight: 400 },
             },
             labels: { style: { fontSize: "10px" } },
-            axisBorder: { show: true, color: "#000000" },
+            axisBorder: { show: true, color: chartTheme.axisColor },
             axisTicks: { show: true },
         },
         yaxis: {
@@ -103,16 +107,17 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
                 style: { fontSize: "10px" },
                 maxWidth: 300
             },
-            axisBorder: { show: true, color: "#000000" },
+            axisBorder: { show: true, color: chartTheme.axisColor },
         },
         grid: {
-            borderColor: "#e0e0e0",
+            borderColor: chartTheme.gridColor,
             strokeDashArray: 4,
             xaxis: { lines: { show: true } },
             yaxis: { lines: { show: false } },
         },
         legend: { show: false },
         tooltip: {
+            theme: chartTheme.tooltipTheme,
             enabled: true,
             y: {
                 formatter: (val) => val.toFixed(3),

@@ -52,7 +52,7 @@ export default function MetricsTable({ aggregatedEvaluationResults }: MetricsTab
             <div id="metrics-table-container" className="w-full overflow-x-auto">
                 <table className="w-full border-collapse">
                     <thead>
-                    <tr className="border-b-2 border-gray-300">
+                    <tr className="border-b-2 border-border">
                         <th className="text-left py-3 px-4 font-semibold">Model</th>
                         <th className="text-right py-3 px-4 font-semibold">Precision</th>
                         <th className="text-right py-3 px-4 font-semibold">Recall</th>
@@ -70,7 +70,7 @@ export default function MetricsTable({ aggregatedEvaluationResults }: MetricsTab
                     </thead>
                     <tbody>
                     {Object.entries(aggregatedEvaluationResults).map(([modelName, metrics]) => (
-                        <tr key={modelName} className="border-b border-gray-200 hover:bg-gray-50">
+                        <tr key={modelName} className="border-b border-border transition-colors hover:bg-muted/50">
                             <td className="py-2 px-4">{modelName}</td>
                             <td className="text-right py-2 px-4 font-mono text-sm">
                                 {formatMetric(metrics.avgPrecision, metrics.stdPrecision)}
