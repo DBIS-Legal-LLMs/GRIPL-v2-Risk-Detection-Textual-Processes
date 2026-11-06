@@ -12,6 +12,24 @@ export const defaultColors = {
     f1Score: "#22c55e",
 };
 
+// Series colors of the text evaluation charts; each set is validated for color-vision deficiencies and
+// contrast in light and dark mode (dataviz palette validator)
+export const textEvaluationColors = {
+    // BPMN vs. text per model
+    bpmn: "#2563eb",
+    text: "#d97706",
+    // partial vs. strict matching
+    partial: "#7c3aed",
+    strict: "#0d9488",
+    // false negatives by pipeline step
+    fnExtraction: "#d97706",
+    fnClassification: "#7c3aed",
+    // extraction quality
+    extractionPrecision: "#7c3aed",
+    extractionRecall: "#d97706",
+    localization: "#0d9488",
+};
+
 export const modelPalette = [
     "#3b82f6",
     "#ef4444",

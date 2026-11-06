@@ -54,7 +54,8 @@ export interface TestCaseReport {
     testCaseId: number;
     datasetId: number;
     testCaseName?: string;
-    imageSrc: string;
+    // SVG preview of the BPMN model; null for text test cases (see textResult)
+    imageSrc: string | null;
     correctActivityIds: string[];
     falsePositiveIds: string[];
     falseNegativeIds: string[];
@@ -66,7 +67,77 @@ export interface TestCaseReport {
     ragMetrics?: TestCaseRagMetrics | null;
     ragPromptContext?: string[] | null;
     perElementType?: Record<string, ElementTypeCounts>;
+    // Text modality only. Then correctActivityIds/falseNegativeIds hold label ids and falsePositiveIds the ids of
+    // the predictions (extracted activities) that caused a false positive
+    textResult?: TextTestCaseResult;
     markdown: string;
+}
+
+export type TextLabelOutcome = "TP" | "FP" | "FN" | "TN" | "IGNORED";
+export type FalseNegativeCause = "EXTRACTION" | "CLASSIFICATION";
+
+// Metrics of the text scoring with strict matching (IoU >= 0.5)
+export interface TextStrictResult extends ElementTypeCounts {
+    precision: number;
+    recall: number;
+    f1Score: number;
+    accuracy: number;
+}
+
+export interface TextLabelResult {
+    id: string;
+    start: number;
+    end: number;
+    text: string;
+    isCritical: boolean;
+    reason?: string | null;
+    // outcome with partial matching (the main measure)
+    outcome: TextLabelOutcome;
+    falseNegativeCause?: FalseNegativeCause | null;
+    matchedPredictionId?: string | null;
+    iou?: number | null;
+    strictOutcome: TextLabelOutcome;
+}
+
+export interface TextPredictionResult {
+    id: string;
+    name?: string | null;
+    exactText: string;
+    isCritical: boolean;
+    reason?: string | null;
+    // position of the quoted passage in the text; null if it could not be located
+    start?: number | null;
+    end?: number | null;
+    // label it is matched to with partial matching
+    matchedLabelId?: string | null;
+}
+
+export interface TextTestCaseResult {
+    processText: string;
+    labels: TextLabelResult[];
+    predictions: TextPredictionResult[];
+    extractionPrecision: number;
+    extractionRecall: number;
+    extractionF1: number;
+    localizationRate: number;
+    meanIou: number;
+    falseNegativesByExtraction: number;
+    falseNegativesByClassification: number;
+    strict: TextStrictResult;
+}
+
+export interface TextSummaryMetrics {
+    evaluatedTestCases: number;
+    labelCount: number;
+    ignoredLabelCount: number;
+    extractionPrecision: number;
+    extractionRecall: number;
+    extractionF1: number;
+    localizationRate: number;
+    meanIou: number;
+    falseNegativesByExtraction: number;
+    falseNegativesByClassification: number;
+    strict: TextStrictResult;
 }
 
 export interface EvaluationReportSummary {
@@ -86,6 +157,8 @@ export interface EvaluationReportSummary {
     totalTrueNegatives: number;
     ragMetrics?: RagSummaryMetrics | null;
     perElementType?: Record<string, ElementTypeSummary>;
+    // Text modality only: extraction metrics and the metrics with strict matching
+    textMetrics?: TextSummaryMetrics;
     markdown: string;
 }
 

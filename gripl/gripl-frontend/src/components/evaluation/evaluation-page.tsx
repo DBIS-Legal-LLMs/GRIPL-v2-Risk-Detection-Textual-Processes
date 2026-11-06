@@ -8,9 +8,11 @@ import {
     EvaluationReportError,
     EvaluationReportStepInfo,
     EvaluationReportSummary,
+    TextSummaryMetrics,
     TestCaseReport
 } from "@/models/dto/ReportData";
 import TestCaseReportCard from "@/components/evaluation/test-case-report/test-case-report-card";
+import TextEvaluationSection from "@/components/evaluation/charts/text/text-evaluation-charts";
 import EvaluationReportSummaryCard from "@/components/evaluation/evaluation-report-summary-card";
 import MetricsCharts from "@/components/evaluation/metrics-charts";
 import {Spinner} from "@/components/ui/spinner";
@@ -22,7 +24,7 @@ import EvaluationConfig from "@/components/evaluation/config/evaluation-config";
 import {Dataset} from "@/models/dto/Dataset";
 import {FileText, Play} from "lucide-react";
 import TestcaseResultsStacked from "@/components/evaluation/charts/aggregated/testcase-results-stacked";
-import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluationResult";
+import {AggregatedEvaluationResults, AggregatedTextResult} from "@/models/evaluation/AggregatedEvaluationResult";
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
@@ -226,6 +228,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 fns: number[];
                 tns: number[];
             }>();
+            // Text modality only: text metrics of every run
+            const textRuns: TextSummaryMetrics[] = [];
 
             for (const [runNum, runSummaries] of summaryByRun.entries()) {
                 const modelSummary = runSummaries.get(modelLabel);
@@ -249,6 +253,9 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     }
                     if (modelSummary.ragMetrics?.faithfulnessMean !== null && modelSummary.ragMetrics?.faithfulnessMean !== undefined) {
                         faithfulnesses.push(modelSummary.ragMetrics.faithfulnessMean);
+                    }
+                    if (modelSummary.textMetrics) {
+                        textRuns.push(modelSummary.textMetrics);
                     }
                     if (modelSummary.perElementType) {
                         for (const [key, typeSummary] of Object.entries(modelSummary.perElementType)) {
@@ -327,6 +334,36 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     }]))
                     : undefined;
 
+                const textStat = (pick: (t: TextSummaryMetrics) => number) => {
+                    const values = textRuns.map(pick);
+                    return { avg: mean(values), std: std(values) };
+                };
+                const text: AggregatedTextResult | undefined = textRuns.length > 0 ? (() => {
+                    const extractionPrecision = textStat((t) => t.extractionPrecision);
+                    const extractionRecall = textStat((t) => t.extractionRecall);
+                    const extractionF1 = textStat((t) => t.extractionF1);
+                    const localizationRate = textStat((t) => t.localizationRate);
+                    const meanIou = textStat((t) => t.meanIou);
+                    const fnExtraction = textStat((t) => t.falseNegativesByExtraction);
+                    const fnClassification = textStat((t) => t.falseNegativesByClassification);
+                    const strictPrecision = textStat((t) => t.strict.precision);
+                    const strictRecall = textStat((t) => t.strict.recall);
+                    const strictF1Score = textStat((t) => t.strict.f1Score);
+                    return {
+                        avgExtractionPrecision: extractionPrecision.avg, stdExtractionPrecision: extractionPrecision.std,
+                        avgExtractionRecall: extractionRecall.avg, stdExtractionRecall: extractionRecall.std,
+                        avgExtractionF1: extractionF1.avg, stdExtractionF1: extractionF1.std,
+                        avgLocalizationRate: localizationRate.avg, stdLocalizationRate: localizationRate.std,
+                        avgMeanIou: meanIou.avg, stdMeanIou: meanIou.std,
+                        avgFalseNegativesByExtraction: fnExtraction.avg, stdFalseNegativesByExtraction: fnExtraction.std,
+                        avgFalseNegativesByClassification: fnClassification.avg, stdFalseNegativesByClassification: fnClassification.std,
+                        avgStrictPrecision: strictPrecision.avg, stdStrictPrecision: strictPrecision.std,
+                        avgStrictRecall: strictRecall.avg, stdStrictRecall: strictRecall.std,
+                        avgStrictF1Score: strictF1Score.avg, stdStrictF1Score: strictF1Score.std,
+                        runsCounted: textRuns.length,
+                    };
+                })() : undefined;
+
                 stats[modelLabel] = {
                     avgPrecision,
                     stdPrecision,
@@ -357,7 +394,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     avgFaithfulness,
                     stdFaithfulness,
                     ragRunsCounted,
-                    perElementType
+                    perElementType,
+                    text
                 }
             }
         }
@@ -706,6 +744,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                     />
                                 </div>
                             )}
+                            <TextEvaluationSection stats={aggregateStats}/>
                         </>)}
                     </div>
                 </> : <Card className="p-4 mb-4">

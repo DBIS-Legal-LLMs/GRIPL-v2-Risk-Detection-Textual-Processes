@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import RagMetricsCard from "./rag-metrics-card";
+import TextMetricsCard from "@/components/evaluation/text/text-metrics-card";
 
 interface SummaryReportCardSingleProps {
     reportSummary: EvaluationReportSummary;
@@ -119,6 +120,10 @@ export default function EvaluationReportSummaryCardSingle({ reportSummary }: Sum
 
             {reportSummary.ragMetrics && (
                 <RagMetricsCard summary={reportSummary.ragMetrics} />
+            )}
+
+            {reportSummary.textMetrics && (
+                <TextMetricsCard metrics={reportSummary.textMetrics} />
             )}
         </div>
     );

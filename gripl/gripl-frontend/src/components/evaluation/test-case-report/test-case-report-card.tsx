@@ -8,6 +8,7 @@ import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/
 import {useState} from "react"
 import {CheckCircle2, ChevronDown, ChevronRight, XCircle} from "lucide-react"
 import TestCaseReportCardPreview from "@/components/evaluation/test-case-report/test-case-report-card-preview";
+import TestCaseReportCardTextPreview, {hasTextResult} from "@/components/evaluation/test-case-report/test-case-report-card-text-preview";
 import TestCaseReportCardReasoning from "@/components/evaluation/test-case-report/test-case-report-card-reasoning";
 import TestCaseReportCardOverview from "@/components/evaluation/test-case-report/test-case-report-card-overview";
 import TestCaseReportCardComparison from "@/components/evaluation/test-case-report/test-case-report-card-comparison";
@@ -61,7 +62,10 @@ export default function TestCaseReportCard({ report }: TestCaseReportCardProps) 
                         <TestCaseReportCardOverview totalExpected={totalExpected} totalActual={totalActual} correctCount={correctCount} />
                         <Separator />
                         <TestCaseReportCardComparison report={report} />
-                        <TestCaseReportCardPreview report={report} />
+                        {/* Text test cases have no BPMN diagram: show the text with the labeled passages instead */}
+                        {hasTextResult(report)
+                            ? <TestCaseReportCardTextPreview report={report} />
+                            : <TestCaseReportCardPreview report={report} />}
                         {report.ragMetrics && (
                             <>
                                 <Separator />
