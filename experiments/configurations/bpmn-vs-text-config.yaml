@@ -1,0 +1,36 @@
+# Comparison run: every model on the BPMN model and on the textual description of the same processes.
+# Results appear per model as "<label> [BPMN]" and "<label> [TEXT]"; the "Text Evaluation" section of the UI
+# compares them directly. Run via the UI (Import YAML) or the CLI, from gripl/gripl-backend:
+#   ./mvnw spring-boot:run "-Dspring-boot.run.arguments=evaluation -c ../../experiments/configurations/bpmn-vs-text-config.yaml -o bpmn-vs-text-report.md"
+
+# The text pipeline exists only for the prompt-engineering analysis; models with the baseline endpoint are
+# rejected for the TEXT modality before the run starts.
+defaultEvaluationEndpoint: /gdpr/analysis/prompt-engineering
+seed: 24523833
+maxConcurrent: 10
+repetitions: 5
+
+modalities:
+  - BPMN
+  - TEXT
+# Only test cases with both a BPMN model and a labeled text, so both modalities are scored on the same processes
+pairedOnly: true
+# Text consists of activities only; BPMN would otherwise also score events, gateways and data objects
+activitiesOnly: true
+
+useRag: false
+# Set explicitly: the backend defaults to true, which fails every test case when useRag is false
+evaluateRag: false
+
+models:
+  - label: GPT-4o
+    llmProps:
+      baseUrl: https://openrouter.ai/api/v1
+      modelName: openai/gpt-4o-2024-11-20
+      apiKey: ${OPENAI_API_KEY}
+      temperature: 0.1
+      topP: 1
+
+# Datasets containing the paired test cases (model and text must describe the same process)
+datasets:
+  - 1
