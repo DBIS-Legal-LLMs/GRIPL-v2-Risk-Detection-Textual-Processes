@@ -29,7 +29,7 @@ class MultiEvaluationRunner(
 
         val modalities = request.modalities.distinct()
         if (EvaluationModality.TEXT in modalities) {
-            // Fail before the run starts: the text pipeline only exists for the prompt-engineering analysis
+            // Fail before the run starts: text counterparts exist only for the prompt-engineering analysis and the baseline
             request.models.forEach { textAnalysisEndpointFor(it.evaluationEndpoint ?: request.defaultEvaluationEndpoint) }
             if (EvaluationModality.BPMN in modalities && !request.activitiesOnly) {
                 log.warn { "Comparing BPMN with TEXT without activitiesOnly: BPMN also scores events, gateways and data " +

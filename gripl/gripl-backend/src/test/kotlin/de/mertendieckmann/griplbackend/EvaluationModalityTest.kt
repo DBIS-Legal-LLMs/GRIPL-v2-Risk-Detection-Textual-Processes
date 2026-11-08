@@ -107,11 +107,19 @@ class EvaluationModalityTest {
     }
 
     @Test
-    fun `text modality rejects endpoints without a text pipeline before the run starts`() {
+    fun `text modality accepts the baseline endpoint`() {
         val fixture = Fixture()
         val baseline = request(listOf(TEXT)).copy(models = listOf(ModelRunConfig("A", evaluationEndpoint = "/gdpr/analysis/baseline")))
-        val error = assertThrows<IllegalArgumentException> { fixture.run(baseline) }
-        assertTrue(error.message!!.contains("baseline"))
+        fixture.run(baseline)
+        assertEquals(listOf("/gdpr/analysis/baseline"), fixture.requests.map { it.evaluationEndpoint })
+    }
+
+    @Test
+    fun `text modality rejects custom endpoints without a text counterpart before the run starts`() {
+        val fixture = Fixture()
+        val custom = request(listOf(TEXT)).copy(models = listOf(ModelRunConfig("A", evaluationEndpoint = "https://example.com/analyze")))
+        val error = assertThrows<IllegalArgumentException> { fixture.run(custom) }
+        assertTrue(error.message!!.contains("https://example.com/analyze"))
         assertTrue(fixture.requests.isEmpty())
     }
 

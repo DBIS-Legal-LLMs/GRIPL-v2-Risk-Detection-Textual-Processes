@@ -140,9 +140,11 @@ class TextEvaluationRunnerTest {
     }
 
     @Test
-    fun `text endpoint is derived from the prompt-engineering endpoint`() {
+    fun `text endpoint is derived from the BPMN endpoint`() {
         assertEquals("/gdpr/analysis/text", textAnalysisEndpointFor("/gdpr/analysis/prompt-engineering"))
         assertEquals("https://host:8080/gdpr/analysis/text", textAnalysisEndpointFor("https://host:8080/gdpr/analysis/prompt-engineering/"))
-        assertThrows<IllegalArgumentException> { textAnalysisEndpointFor("/gdpr/analysis/baseline") }
+        assertEquals("/gdpr/analysis/text-baseline", textAnalysisEndpointFor("/gdpr/analysis/baseline"))
+        assertEquals("http://localhost:8081/gdpr/analysis/text-baseline", textAnalysisEndpointFor("http://localhost:8081/gdpr/analysis/baseline"))
+        assertThrows<IllegalArgumentException> { textAnalysisEndpointFor("https://example.com/analyze") }
     }
 }

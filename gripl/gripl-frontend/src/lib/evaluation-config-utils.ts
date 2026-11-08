@@ -67,10 +67,12 @@ export function pruneNulls<T>(obj: T): T {
     return obj as T;
 }
 
-const PROMPT_ENGINEERING_ENDPOINT = "/gdpr/analysis/prompt-engineering";
+// BPMN analysis approaches with a text counterpart (two-step text pipeline and text baseline)
+const TEXT_CAPABLE_ENDPOINTS = ["/gdpr/analysis/prompt-engineering", "/gdpr/analysis/baseline"];
 
-// The text pipeline exists only for the prompt-engineering analysis; the backend rejects other endpoints
-// (e.g. the baseline) for the text modality before the run starts
+// The backend rejects other (custom) endpoints for the text modality before the run starts, as their text
+// counterpart is unknown
 export function isTextCapableEndpoint(endpoint: string | null | undefined): boolean {
-    return !!endpoint && endpoint.trim().replace(/\/+$/, "").endsWith(PROMPT_ENGINEERING_ENDPOINT);
+    const normalized = endpoint?.trim().replace(/\/+$/, "");
+    return !!normalized && TEXT_CAPABLE_ENDPOINTS.some((e) => normalized.endsWith(e));
 }

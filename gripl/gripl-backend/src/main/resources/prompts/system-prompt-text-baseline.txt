@@ -1,0 +1,2 @@
+Your task is to identify all activities (tasks) in the given process description and to determine for each activity whether it processes personal data.
+For every activity, copy the exact, verbatim passage of the text that describes it.

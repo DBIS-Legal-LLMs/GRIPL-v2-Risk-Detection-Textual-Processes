@@ -6,6 +6,7 @@ import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.RagMode
+import dev.langchain4j.model.chat.ChatModel
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.env.Environment
@@ -127,8 +128,40 @@ class AnalysisController(
         @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
         @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
         @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
-    ): Mono<ResponseEntity<AnalysisResponse>> {
+    ): Mono<ResponseEntity<AnalysisResponse>> =
+        analyzeText(processTextPart, llmPropsOverrides, useRagPart, ragModePart) { llm, processText, useRag, ragMode ->
+            analyzerFactory.createTextAnalyzer(llm).analyzeTextForGdpr(processText, useRag, ragMode)
+        }
 
+    @Operation(
+        summary = "Analyzes a textual process description for GDPR relevance using baseline method",
+        description = "Send the process description as form field **processText**. A single LLM call with a minimal prompt"
+            + " extracts the activities and classifies them at once (no separate extraction step, no RAG). Returns the"
+            + " same response shape as /text: the GDPR-relevant activities and all extracted activities."
+    )
+    @PostMapping(
+        "/text-baseline",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeTextForGdprBaseline(
+        @RequestPart("processText") processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> =
+        analyzeText(processTextPart, llmPropsOverrides, useRagPart, ragModePart) { llm, processText, useRag, _ ->
+            analyzerFactory.createBaselineTextAnalyzer(llm).analyzeTextForGdpr(processText, useRag)
+        }
+
+    // Shared by both text endpoints: validates the text, reads the parameters and builds the LLM per request
+    private fun analyzeText(
+        processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride?,
+        useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        analyze: (llm: ChatModel, processText: String, useRag: Boolean, ragMode: RagMode) -> AnalysisResponse
+    ): Mono<ResponseEntity<AnalysisResponse>> {
         val processText = processTextPart.value()
         if (processText.isBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "processText must not be empty")
@@ -139,8 +172,7 @@ class AnalysisController(
 
         return Mono.fromCallable {
             val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
-            val analyzer = analyzerFactory.createTextAnalyzer(llm)
-            analyzer.analyzeTextForGdpr(processText, useRag, ragMode)
+            analyze(llm, processText, useRag, ragMode)
         }.subscribeOn(Schedulers.boundedElastic())
             .map { ResponseEntity.ok(it) }
     }

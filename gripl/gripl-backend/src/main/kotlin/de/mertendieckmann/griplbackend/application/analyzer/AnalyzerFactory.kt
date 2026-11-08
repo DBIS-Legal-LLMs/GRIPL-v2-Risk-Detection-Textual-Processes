@@ -26,4 +26,9 @@ class AnalyzerFactory(
     fun createTextAnalyzer(chatModel: ChatModel): TextAnalyzer {
         return TextAnalyzer(createTextActivityExtractor(chatModel), createPromptEngineeringAnalyzer(chatModel))
     }
+
+    // Single-call text baseline, the counterpart of the BPMN baseline
+    fun createBaselineTextAnalyzer(chatModel: ChatModel): BaselineTextAnalyzer {
+        return BaselineTextAnalyzer(chatModel)
+    }
 }

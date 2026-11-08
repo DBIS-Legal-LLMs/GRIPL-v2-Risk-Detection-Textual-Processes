@@ -109,7 +109,7 @@ export function useEvaluationConfig(
         onMultiConfigChanged(multi);
     }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, modalities, pairedOnly, onMultiConfigChanged]);
 
-    // Models the backend would reject for the text modality (no text pipeline for their endpoint, e.g. the baseline)
+    // Models the backend would reject for the text modality (custom endpoints without a known text counterpart)
     const textIncompatibleModels = useMemo(() => {
         if (!modalities.includes("TEXT")) return [];
         return models

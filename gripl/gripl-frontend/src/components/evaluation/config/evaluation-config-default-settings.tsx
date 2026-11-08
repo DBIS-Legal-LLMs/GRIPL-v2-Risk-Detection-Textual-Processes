@@ -25,7 +25,7 @@ interface EvaluationConfigDefaultSettingsProps {
     activitiesOnly: boolean;
     modalities: EvaluationModality[];
     pairedOnly: boolean;
-    // Models the backend would reject for the text modality (their endpoint has no text pipeline)
+    // Models the backend would reject for the text modality (custom endpoints without a known text counterpart)
     textIncompatibleModels: string[];
     setDefaultEndpointChoice: (endpoint: EndpointChoice) => void;
     setDefaultPresetEndpoint: (endpoint: string) => void;
@@ -232,8 +232,8 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                         <div className="flex gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
                             <AlertTriangle className="h-4 w-4 shrink-0 text-destructive"/>
                             <p>
-                                The text modality is only available for the prompt-engineering analysis. The run will
-                                be rejected, as these models use another endpoint (e.g. the baseline):{" "}
+                                The text modality is only available for the prompt-engineering analysis and the
+                                baseline. The run will be rejected, as these models use a custom endpoint:{" "}
                                 {textIncompatibleModels.join(", ")}.
                             </p>
                         </div>

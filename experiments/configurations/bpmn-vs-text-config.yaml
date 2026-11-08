@@ -3,8 +3,9 @@
 # compares them directly. Run via the UI (Import YAML) or the CLI, from gripl/gripl-backend:
 #   ./mvnw spring-boot:run "-Dspring-boot.run.arguments=evaluation -c ../../experiments/configurations/bpmn-vs-text-config.yaml -o bpmn-vs-text-report.md"
 
-# The text pipeline exists only for the prompt-engineering analysis; models with the baseline endpoint are
-# rejected for the TEXT modality before the run starts.
+# Each endpoint has a text counterpart: prompt-engineering -> the two-step text pipeline, baseline -> the text baseline.
+# For a baseline comparison, add the models a second time with "evaluationEndpoint: /gdpr/analysis/baseline" and a
+# distinct label (e.g. "GPT-4o Baseline"). Custom endpoints are rejected for the TEXT modality before the run starts.
 defaultEvaluationEndpoint: /gdpr/analysis/prompt-engineering
 seed: 24523833
 maxConcurrent: 10
