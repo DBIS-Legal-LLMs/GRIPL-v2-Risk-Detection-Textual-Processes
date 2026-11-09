@@ -32,6 +32,14 @@ export const textEvaluationColors = {
     localization: "#0d9488",
 };
 
+// Flip analysis: improvements cool, deteriorations warm
+export const flipColors = {
+    FIXED_MISS: "#4f46e5",
+    REMOVED_FALSE_ALARM: "#0ea5e9",
+    NEW_MISS: "#db2777",
+    NEW_FALSE_ALARM: "#ca8a04",
+};
+
 export const modelPalette = [
     "#3b82f6",
     "#ef4444",

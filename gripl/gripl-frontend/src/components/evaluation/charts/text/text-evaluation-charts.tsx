@@ -6,7 +6,8 @@ import TextBarChart from "@/components/evaluation/charts/text/text-bar-chart";
 import {textEvaluationColors} from "@/components/evaluation/charts/common/palettes";
 import TextMetricsTable from "@/components/evaluation/text/text-metrics-table";
 import type {AggregatedEvaluationResults, AggregatedTextResult} from "@/models/evaluation/AggregatedEvaluationResult";
-import {EVALUATION_MODALITIES, EvaluationModality, MODALITY_LABELS} from "@/models/dto/MultiEvaluationRequest";
+import {EvaluationModality} from "@/models/dto/MultiEvaluationRequest";
+import {parseRunLabel} from "@/lib/run-labels";
 
 type TextResults = Array<{ label: string; text: AggregatedTextResult; f1: number; sdF1: number }>;
 
@@ -105,9 +106,6 @@ const MODALITY_SERIES: Array<{ modality: EvaluationModality; name: string; color
     {modality: "TEXT_WITH_BPMN", name: "Text + BPMN", color: textEvaluationColors.textWithBpmn},
 ];
 
-const MODALITY_BY_LABEL = new Map(EVALUATION_MODALITIES.map((m) => [MODALITY_LABELS[m], m]));
-const MODALITY_SUFFIX = /^(.*) \[([A-Z+]+)]$/;
-
 // The core comparison of the thesis: the same model on the BPMN model, the text and their combinations of the same
 // processes. Renders nothing unless the models were evaluated with at least two modalities.
 export function ModalityComparisonChart({stats}: { stats: AggregatedEvaluationResults }) {
@@ -116,10 +114,9 @@ export function ModalityComparisonChart({stats}: { stats: AggregatedEvaluationRe
     // Group the run labels "<model> [BPMN]", "<model> [TEXT+BPMN]", ... by model
     const byModel = new Map<string, Partial<Record<EvaluationModality, string>>>();
     for (const label of Object.keys(stats)) {
-        const match = MODALITY_SUFFIX.exec(label);
-        const modality = match && MODALITY_BY_LABEL.get(match[2]);
-        if (!match || !modality) continue;
-        byModel.set(match[1], {...byModel.get(match[1]), [modality]: label});
+        const parsed = parseRunLabel(label);
+        if (!parsed) continue;
+        byModel.set(parsed.model, {...byModel.get(parsed.model), [parsed.modality]: label});
     }
     const series = MODALITY_SERIES.filter((s) => [...byModel.values()].some((e) => e[s.modality]));
     const models = [...byModel.entries()].filter(([, e]) => series.every((s) => e[s.modality]));
