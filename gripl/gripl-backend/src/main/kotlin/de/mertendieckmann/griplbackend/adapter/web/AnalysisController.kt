@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.adapter.web
 
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
 import de.mertendieckmann.griplbackend.application.analyzer.AnalyzerFactory
+import de.mertendieckmann.griplbackend.application.analyzer.BpmnAnalyzer
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
@@ -109,6 +110,78 @@ class AnalysisController(
                     ragMode = ragMode,
                     activitiesOnly = activitiesOnly
                 )            }.subscribeOn(Schedulers.boundedElastic())
+        }.map { ResponseEntity.ok(it) }
+    }
+
+    @Operation(
+        summary = "(Combi Analysis BPMN+TEXT) Analyzes BPMN-XML for GDPR relevance with prompt engineering, using the textual description as context",
+        description = "Model-centric combined analysis: upload the BPMN model (file part **bpmnFile**) and the textual description"
+            + " of the same process (form field **processText**). The model is analyzed like /prompt-engineering, with the"
+            + " description appended as additional context; the BPMN model defines which elements are classified."
+    )
+    @PostMapping(
+        "/bpmn-with-text",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeBpmnWithTextForGdprPromptEngineering(
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("processText") processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> =
+        analyzeBpmnWithText(file, processTextPart, llmPropsOverrides, useRagPart, ragModePart, activitiesOnlyPart) {
+            analyzerFactory.createPromptEngineeringAnalyzer(it)
+        }
+
+    @Operation(
+        summary = "Analyzes BPMN-XML for GDPR relevance using baseline method, with the textual description as context",
+        description = "Baseline counterpart of /bpmn-with-text: the BPMN model (file part **bpmnFile**) is analyzed like /baseline,"
+            + " with the textual description (form field **processText**) appended as additional context."
+    )
+    @PostMapping(
+        "/bpmn-with-text-baseline",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeBpmnWithTextForGdprBaseline(
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("processText") processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> =
+        analyzeBpmnWithText(file, processTextPart, llmPropsOverrides, useRagPart, ragModePart, activitiesOnlyPart) {
+            analyzerFactory.createBaselineAnalyzer(it)
+        }
+
+    // Shared by both model-centric combined endpoints
+    private fun analyzeBpmnWithText(
+        file: FilePart,
+        processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride?,
+        useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        analyzerOf: (ChatModel) -> BpmnAnalyzer
+    ): Mono<ResponseEntity<AnalysisResponse>> {
+        val processText = processTextPart.value()
+        if (processText.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "processText must not be empty")
+        }
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = parseRagMode(ragModePart)
+        val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
+        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
+
+        return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
+            Mono.fromCallable {
+                val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
+                analyzerOf(llm).analyzeBpmnWithTextForGdpr(bpmnXml, processText, useRag, ragMode, activitiesOnly)
+            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
 

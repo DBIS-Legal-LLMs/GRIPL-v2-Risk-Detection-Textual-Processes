@@ -24,4 +24,13 @@ interface PromptBpmnAnalysisAiService {
         @MemoryId sessionId: String,
         @UserMessage formattedPrompt: String
     ): BpmnAnalysisResult
+
+    /**
+     * (Combi Analysis BPMN+TEXT) Analyse BPMN elements without RAG context, with the textual process description appended.
+     * [formattedPrompt] is the rendered element set followed by the process description section.
+     */
+    fun analyzeWithProcessText(
+        @MemoryId sessionId: String,
+        @UserMessage formattedPrompt: String
+    ): BpmnAnalysisResult
 }

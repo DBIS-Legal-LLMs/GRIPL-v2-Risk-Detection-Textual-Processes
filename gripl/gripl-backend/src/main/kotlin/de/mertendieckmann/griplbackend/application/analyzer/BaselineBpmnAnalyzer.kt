@@ -3,6 +3,7 @@ package de.mertendieckmann.griplbackend.application.analyzer
 import de.mertendieckmann.griplbackend.ai.BaselineBpmnAnalysisAiServiceFactory
 import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
+import de.mertendieckmann.griplbackend.application.ProcessDescriptionContext
 import de.mertendieckmann.griplbackend.application.SafetyNet
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.RagMode
@@ -18,7 +19,24 @@ class BaselineBpmnAnalyzer(
     private val memoryProvider = SharedChatMemoryProvider(50)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse =
+        analyze(bpmnXml, userMessage = bpmnXml, useRag = useRag, activitiesOnly = activitiesOnly)
+
+    override fun analyzeBpmnWithTextForGdpr(
+        bpmnXml: String,
+        processText: String,
+        useRag: Boolean,
+        ragMode: RagMode,
+        activitiesOnly: Boolean
+    ): AnalysisResponse = analyze(
+        bpmnXml,
+        userMessage = ProcessDescriptionContext.appendTo(bpmnXml, processText),
+        useRag = useRag,
+        activitiesOnly = activitiesOnly
+    )
+
+    // [userMessage] is the raw BPMN XML, optionally followed by the process description section
+    private fun analyze(bpmnXml: String, userMessage: String, useRag: Boolean, activitiesOnly: Boolean): AnalysisResponse {
         if (useRag) {
             log.warn { "Baseline analyzer does not support RAG — useRag=true is ignored; results are baseline-only." }
         }
@@ -31,7 +49,7 @@ class BaselineBpmnAnalyzer(
             sessionId = sessionId,
             maxRetries = 3
         ) {
-            bpmnAnalysisAiService.analyze(sessionId, bpmnXml)
+            bpmnAnalysisAiService.analyze(sessionId, userMessage)
         }
 
         val analysisResult = result.first.resolveActivities(bpmnElements)

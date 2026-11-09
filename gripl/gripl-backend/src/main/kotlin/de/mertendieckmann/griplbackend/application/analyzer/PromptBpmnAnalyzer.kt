@@ -3,6 +3,7 @@ package de.mertendieckmann.griplbackend.application.analyzer
 import de.mertendieckmann.griplbackend.ai.PromptBpmnAnalysisAiServiceFactory
 import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
+import de.mertendieckmann.griplbackend.application.ProcessDescriptionContext
 import de.mertendieckmann.griplbackend.application.SafetyNet
 import de.mertendieckmann.griplbackend.adapter.rag.RagApiClient
 import de.mertendieckmann.griplbackend.model.BpmnElement
@@ -34,11 +35,30 @@ class PromptBpmnAnalyzer(
         return analyzeElements(bpmnElements, useRag, ragMode, activitiesOnly)
     }
 
+    override fun analyzeBpmnWithTextForGdpr(
+        bpmnXml: String,
+        processText: String,
+        useRag: Boolean,
+        ragMode: RagMode,
+        activitiesOnly: Boolean
+    ): AnalysisResponse {
+        val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
+        return analyzeElements(bpmnElements, useRag, ragMode, activitiesOnly, processText)
+    }
+
     /**
      * Source-agnostic part of the pipeline: classifies an already extracted set of elements.
      * Used by the BPMN path above and by [TextAnalyzer] (elements extracted from text).
+     * With [processText], the textual process description is appended as additional context; without it, the prompts
+     * are exactly the BPMN-only ones. RAG retrieval is based on the elements only.
      */
-    fun analyzeElements(bpmnElements: Set<BpmnElement>, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
+    fun analyzeElements(
+        bpmnElements: Set<BpmnElement>,
+        useRag: Boolean,
+        ragMode: RagMode,
+        activitiesOnly: Boolean,
+        processText: String? = null
+    ): AnalysisResponse {
         val sessionId = UUID.randomUUID().toString()
 
         if (useRag) {
@@ -55,6 +75,7 @@ class PromptBpmnAnalyzer(
 
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
                 val formattedPrompt = renderCombinedPrompt(bpmnElements, pool)
+                    .let { prompt -> processText?.let { ProcessDescriptionContext.appendTo(prompt, it) } ?: prompt }
                 bpmnAnalysisAiServiceWithRag.analyzeWithRagContext(sessionId, formattedPrompt)
             }
 
@@ -71,7 +92,14 @@ class PromptBpmnAnalyzer(
             // Original path — unchanged from evaluation baseline
             val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider, activitiesOnly)
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
-                bpmnAnalysisAiServiceNoRag.analyze(sessionId, bpmnElements)
+                if (processText == null) {
+                    bpmnAnalysisAiServiceNoRag.analyze(sessionId, bpmnElements)
+                } else {
+                    // Same rendering of the elements as the call above (langchain4j uses toString), plus the text
+                    bpmnAnalysisAiServiceNoRag.analyzeWithProcessText(
+                        sessionId, ProcessDescriptionContext.appendTo(bpmnElements.toString(), processText)
+                    )
+                }
             }
 
             val analysisResult = result.first.resolveActivities(bpmnElements)

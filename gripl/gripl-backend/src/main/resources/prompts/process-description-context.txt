@@ -1,0 +1,2 @@
+=== PROCESS DESCRIPTION (ADDITIONAL CONTEXT) ===
+The following textual description describes the same process as the BPMN model. Use it only as additional context to judge the BPMN elements, for example which data an element processes or who is involved. The BPMN model defines which elements exist: classify only the BPMN elements by their IDs, and do not add elements that appear only in the description.

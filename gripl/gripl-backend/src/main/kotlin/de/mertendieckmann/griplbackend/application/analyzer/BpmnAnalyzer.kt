@@ -16,4 +16,17 @@ interface BpmnAnalyzer {
         ragMode: RagMode = RagMode.HYBRID,
         activitiesOnly: Boolean = false
     ): AnalysisResponse
+
+    /**
+     * Model-centric Combi Analysis BPMN+TEXT: analyzes the BPMN model like [analyzeBpmnForGdpr], with the textual description
+     * of the same process appended as additional context ([de.mertendieckmann.griplbackend.application.ProcessDescriptionContext]).
+     * The BPMN model defines which elements are classified.
+     */
+    fun analyzeBpmnWithTextForGdpr(
+        bpmnXml: String,
+        processText: String,
+        useRag: Boolean = false,
+        ragMode: RagMode = RagMode.HYBRID,
+        activitiesOnly: Boolean = false
+    ): AnalysisResponse
 }
