@@ -250,6 +250,53 @@ class AnalysisController(
             .map { ResponseEntity.ok(it) }
     }
 
+    @Operation(
+        summary = "(Combi Analysis TEXT+BPMN) Analyzes a textual process description for GDPR relevance, guided by the BPMN model (two-step pipeline)",
+        description = "Text-centric combined analysis: send the process description (form field **processText**) and the BPMN"
+            + " model of the same process (file part **bpmnFile**). Like /text, but step 1 gets the model's activities as a"
+            + " reference for the extraction; step 2 is unchanged. Returns the same response shape as /text."
+    )
+    @PostMapping(
+        "/text-with-bpmn",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeTextWithBpmnForGdpr(
+        @RequestPart("processText") processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> =
+        ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
+            analyzeText(processTextPart, llmPropsOverrides, useRagPart, ragModePart) { llm, processText, useRag, ragMode ->
+                analyzerFactory.createTextAnalyzer(llm).analyzeTextForGdpr(processText, useRag, ragMode, bpmnXml)
+            }
+        }
+
+    @Operation(
+        summary = "Analyzes a textual process description for GDPR relevance using baseline method, guided by the BPMN model",
+        description = "Baseline counterpart of /text-with-bpmn: like /text-baseline, with the model's activities (file part"
+            + " **bpmnFile**) appended to the description (form field **processText**) as a reference."
+    )
+    @PostMapping(
+        "/text-with-bpmn-baseline",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeTextWithBpmnForGdprBaseline(
+        @RequestPart("processText") processTextPart: org.springframework.http.codec.multipart.FormFieldPart,
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> =
+        ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
+            analyzeText(processTextPart, llmPropsOverrides, useRagPart, ragModePart) { llm, processText, useRag, _ ->
+                analyzerFactory.createBaselineTextAnalyzer(llm).analyzeTextForGdpr(processText, useRag, bpmnXml)
+            }
+        }
+
     private fun parseRagMode(ragModePart: org.springframework.http.codec.multipart.FormFieldPart?): RagMode {
         val raw = ragModePart?.value() ?: return RagMode.HYBRID
         return try {

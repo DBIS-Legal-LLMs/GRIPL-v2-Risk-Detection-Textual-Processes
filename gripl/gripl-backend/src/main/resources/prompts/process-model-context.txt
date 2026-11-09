@@ -1,0 +1,2 @@
+=== BPMN PROCESS MODEL (ADDITIONAL CONTEXT) ===
+The following activities are taken from a BPMN model of the same process. Use them only as a reference for which activities the process contains. Take the activities from the text as instructed: copy the passage of each activity verbatim from the text above, never from this list, and do not add activities that are not described in the text.

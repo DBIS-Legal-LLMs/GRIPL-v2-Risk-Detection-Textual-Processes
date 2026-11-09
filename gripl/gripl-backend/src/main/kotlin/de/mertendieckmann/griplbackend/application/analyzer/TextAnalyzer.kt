@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.application.analyzer
 
+import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.application.TextActivityExtractor
 import de.mertendieckmann.griplbackend.model.BpmnElement
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
@@ -19,8 +20,18 @@ class TextAnalyzer(
     private val elementAnalyzer: PromptBpmnAnalyzer
 ) {
 
-    fun analyzeTextForGdpr(processText: String, useRag: Boolean = false, ragMode: RagMode = RagMode.HYBRID): AnalysisResponse {
-        val extraction = extractor.extractActivities(processText)
+    /**
+     * With [bpmnXml] (text-centric (Combi Analysis TEXT+BPMN)), the BPMN model of the same process guides step 1 only: its
+     * activities are a reference for the extraction, while step 2 classifies the extracted activities exactly as
+     * without a model — so a comparison with the text-only analysis isolates the model's effect on the extraction.
+     */
+    fun analyzeTextForGdpr(
+        processText: String,
+        useRag: Boolean = false,
+        ragMode: RagMode = RagMode.HYBRID,
+        bpmnXml: String? = null
+    ): AnalysisResponse {
+        val extraction = extractor.extractActivities(processText, bpmnXml?.let { BpmnExtractor().extractBpmnElements(it) })
         val response = elementAnalyzer.analyzeElements(toBpmnElements(extraction), useRag, ragMode, activitiesOnly = true)
 
         // Attach the source passage of each critical activity, so the frontend can highlight it in the text,

@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.application
 
 import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.ai.TextActivityExtractionAiServiceFactory
+import de.mertendieckmann.griplbackend.model.BpmnElement
 import de.mertendieckmann.griplbackend.model.text.TextExtractionResult
 import dev.langchain4j.model.chat.ChatModel
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,9 +26,14 @@ class TextActivityExtractor(
     private val memoryProvider = SharedChatMemoryProvider(50)
     private val extractionAiService = TextActivityExtractionAiServiceFactory.create(llm, memoryProvider)
 
-    fun extractActivities(processText: String): TextExtractionResult {
+    /**
+     * With [bpmnElements] (text-centric (Combi Analysis TEXT+BPMN)), the model's activities are appended to the text as a
+     * reference ([ProcessModelContext]); without them, the call is exactly the text-only extraction.
+     */
+    fun extractActivities(processText: String, bpmnElements: Set<BpmnElement>? = null): TextExtractionResult {
         val sessionId = UUID.randomUUID().toString()
-        val result = extractionAiService.extract(sessionId, processText)
+        val userMessage = bpmnElements?.let { ProcessModelContext.appendTo(processText, it) } ?: processText
+        val result = extractionAiService.extract(sessionId, userMessage)
         
         log.info { "Text Extraction Result: $result" }
 

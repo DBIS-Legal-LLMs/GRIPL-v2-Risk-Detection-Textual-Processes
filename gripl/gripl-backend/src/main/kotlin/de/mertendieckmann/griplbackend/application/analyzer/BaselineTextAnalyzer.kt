@@ -2,6 +2,8 @@ package de.mertendieckmann.griplbackend.application.analyzer
 
 import de.mertendieckmann.griplbackend.ai.BaselineTextAnalysisAiServiceFactory
 import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
+import de.mertendieckmann.griplbackend.application.BpmnExtractor
+import de.mertendieckmann.griplbackend.application.ProcessModelContext
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.text.TextBaselineResult
 import dev.langchain4j.model.chat.ChatModel
@@ -19,11 +21,17 @@ class BaselineTextAnalyzer(
     private val log = KotlinLogging.logger { }
     private val aiService = BaselineTextAnalysisAiServiceFactory.create(llm, SharedChatMemoryProvider(50))
 
-    fun analyzeTextForGdpr(processText: String, useRag: Boolean = false): AnalysisResponse {
+    /**
+     * With [bpmnXml](text-centric (Combi Analysis TEXT+BPMN)), the model's activities are appended to the text as a reference.
+     * The baseline has a single call, so the reference affects extraction and classification alike.
+     */
+    fun analyzeTextForGdpr(processText: String, useRag: Boolean = false, bpmnXml: String? = null): AnalysisResponse {
         if (useRag) {
             log.warn { "Baseline text analyzer does not support RAG — useRag=true is ignored; results are baseline-only." }
         }
-        val result = aiService.analyze(UUID.randomUUID().toString(), processText)
+        val userMessage = bpmnXml?.let { ProcessModelContext.appendTo(processText, BpmnExtractor().extractBpmnElements(it)) }
+            ?: processText
+        val result = aiService.analyze(UUID.randomUUID().toString(), userMessage)
         log.info { "Text Baseline Result: $result" }
         return toAnalysisResponse(result)
     }
