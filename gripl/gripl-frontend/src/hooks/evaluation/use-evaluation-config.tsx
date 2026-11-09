@@ -5,7 +5,7 @@ import fetchAnalysisEndpoints from "@/actions/analysis-endpoints";
 import { Dataset } from "@/models/dto/Dataset";
 import { EvaluationModality, ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
 import {EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
-import {cryptoRandomId, isTextCapableEndpoint, normalize} from "@/lib/evaluation-config-utils";
+import {cryptoRandomId, hasModalityCounterparts, normalize} from "@/lib/evaluation-config-utils";
 
 export function newModelRow(index: number): ModelRowState {
     return {
@@ -109,9 +109,9 @@ export function useEvaluationConfig(
         onMultiConfigChanged(multi);
     }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, modalities, pairedOnly, onMultiConfigChanged]);
 
-    // Models the backend would reject for the text modality (custom endpoints without a known text counterpart)
+    // Models the backend would reject for the text and combined modalities (custom endpoints without a known counterpart)
     const textIncompatibleModels = useMemo(() => {
-        if (!modalities.includes("TEXT")) return [];
+        if (modalities.every((m) => m === "BPMN")) return [];
         return models
             .filter((model) => {
                 const endpoint =
@@ -120,7 +120,7 @@ export function useEvaluationConfig(
                         : model.endpointChoice === "preset"
                             ? model.selectedPresetEndpoint
                             : model.customEndpoint;
-                return !isTextCapableEndpoint(endpoint);
+                return !hasModalityCounterparts(endpoint);
             })
             .map((model) => model.label.trim() || "Model");
     }, [modalities, models, effectiveDefaultEndpoint]);

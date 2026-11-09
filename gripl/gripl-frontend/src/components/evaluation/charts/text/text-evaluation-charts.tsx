@@ -6,6 +6,7 @@ import TextBarChart from "@/components/evaluation/charts/text/text-bar-chart";
 import {textEvaluationColors} from "@/components/evaluation/charts/common/palettes";
 import TextMetricsTable from "@/components/evaluation/text/text-metrics-table";
 import type {AggregatedEvaluationResults, AggregatedTextResult} from "@/models/evaluation/AggregatedEvaluationResult";
+import {EVALUATION_MODALITIES, EvaluationModality, MODALITY_LABELS} from "@/models/dto/MultiEvaluationRequest";
 
 type TextResults = Array<{ label: string; text: AggregatedTextResult; f1: number; sdF1: number }>;
 
@@ -97,41 +98,50 @@ const METRIC_KEYS: Record<ComparisonMetric, { mean: "avgF1Score" | "avgPrecision
     Recall: {mean: "avgRecall", sd: "stdRecall"},
 };
 
-const MODALITY_SUFFIX = /^(.*) \[(BPMN|TEXT)]$/;
+const MODALITY_SERIES: Array<{ modality: EvaluationModality; name: string; color: string }> = [
+    {modality: "BPMN", name: "BPMN", color: textEvaluationColors.bpmn},
+    {modality: "TEXT", name: "Text", color: textEvaluationColors.text},
+    {modality: "BPMN_WITH_TEXT", name: "BPMN + Text", color: textEvaluationColors.bpmnWithText},
+    {modality: "TEXT_WITH_BPMN", name: "Text + BPMN", color: textEvaluationColors.textWithBpmn},
+];
 
-// The core comparison of the thesis: the same model on the BPMN model and on the text of the same processes
+const MODALITY_BY_LABEL = new Map(EVALUATION_MODALITIES.map((m) => [MODALITY_LABELS[m], m]));
+const MODALITY_SUFFIX = /^(.*) \[([A-Z+]+)]$/;
+
+// The core comparison of the thesis: the same model on the BPMN model, the text and their combinations of the same
+// processes. Renders nothing unless the models were evaluated with at least two modalities.
 export function ModalityComparisonChart({stats}: { stats: AggregatedEvaluationResults }) {
     const [metric, setMetric] = useState<ComparisonMetric>("F1");
 
-    // Group the run labels "<model> [BPMN]" / "<model> [TEXT]" by model
-    const byModel = new Map<string, { BPMN?: string; TEXT?: string }>();
+    // Group the run labels "<model> [BPMN]", "<model> [TEXT+BPMN]", ... by model
+    const byModel = new Map<string, Partial<Record<EvaluationModality, string>>>();
     for (const label of Object.keys(stats)) {
         const match = MODALITY_SUFFIX.exec(label);
-        if (!match) continue;
-        const entry = byModel.get(match[1]) ?? {};
-        entry[match[2] as "BPMN" | "TEXT"] = label;
-        byModel.set(match[1], entry);
+        const modality = match && MODALITY_BY_LABEL.get(match[2]);
+        if (!match || !modality) continue;
+        byModel.set(match[1], {...byModel.get(match[1]), [modality]: label});
     }
-    const models = [...byModel.entries()].filter(([, e]) => e.BPMN && e.TEXT);
-    if (models.length === 0) return null;
+    const series = MODALITY_SERIES.filter((s) => [...byModel.values()].some((e) => e[s.modality]));
+    const models = [...byModel.entries()].filter(([, e]) => series.every((s) => e[s.modality]));
+    if (series.length < 2 || models.length === 0) return null;
 
     const keys = METRIC_KEYS[metric];
-    const valuesOf = (modality: "BPMN" | "TEXT") => ({
-        mean: models.map(([, e]) => stats[e[modality]!][keys.mean]),
-        sd: models.map(([, e]) => stats[e[modality]!][keys.sd]),
-    });
+    const metricName = metric === "F1" ? "F1-Score" : metric;
 
     return <TextBarChart
         chartId="modality-comparison-chart"
-        title="BPMN vs. Text"
-        description={`${metric === "F1" ? "F1-Score" : metric} per model on the BPMN model and on the text description (mean ± SD)`}
+        title="Modalities per Model"
+        description={`${metricName} per model and modality (mean ± SD). BPMN and BPMN + Text are scored on the ` +
+            "labeled BPMN elements, Text and Text + BPMN on the labeled text passages."}
         categories={models.map(([model]) => model)}
-        yTitle={metric === "F1" ? "F1-Score" : metric}
+        yTitle={metricName}
         yMax={1}
-        series={[
-            {name: "BPMN", color: textEvaluationColors.bpmn, ...valuesOf("BPMN")},
-            {name: "Text", color: textEvaluationColors.text, ...valuesOf("TEXT")},
-        ]}
+        series={series.map((s) => ({
+            name: s.name,
+            color: s.color,
+            mean: models.map(([, e]) => stats[e[s.modality]!][keys.mean]),
+            sd: models.map(([, e]) => stats[e[s.modality]!][keys.sd]),
+        }))}
         headerExtra={<div className="flex gap-1">
             {(Object.keys(METRIC_KEYS) as ComparisonMetric[]).map((m) => (
                 <Button key={m} size="sm" variant={m === metric ? "default" : "outline"} onClick={() => setMetric(m)}>{m}</Button>
@@ -149,12 +159,9 @@ export default function TextEvaluationSection({stats}: { stats: AggregatedEvalua
 
     return <div className="space-y-6">
         <h2 className="text-2xl font-semibold">Text Evaluation</h2>
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <ModalityComparisonChart stats={stats}/>
-            <PartialVsStrictChart textResults={textResults}/>
-        </div>
         <TextMetricsTable textResults={textResults}/>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            <PartialVsStrictChart textResults={textResults}/>
             <ExtractionQualityChart textResults={textResults}/>
             <FalseNegativeCausesChart textResults={textResults}/>
         </div>

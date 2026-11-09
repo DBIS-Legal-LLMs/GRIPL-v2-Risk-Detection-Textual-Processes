@@ -15,9 +15,11 @@ export const defaultColors = {
 // Series colors of the text evaluation charts; each set is validated for color-vision deficiencies and
 // contrast in light and dark mode (dataviz palette validator)
 export const textEvaluationColors = {
-    // BPMN vs. text per model
+    // modalities per model (BPMN family blue, text family warm)
     bpmn: "#2563eb",
     text: "#d97706",
+    bpmnWithText: "#0ea5e9",
+    textWithBpmn: "#e11d48",
     // partial vs. strict matching
     partial: "#7c3aed",
     strict: "#0d9488",

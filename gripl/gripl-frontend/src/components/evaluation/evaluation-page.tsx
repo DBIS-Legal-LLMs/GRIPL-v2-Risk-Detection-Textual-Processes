@@ -12,7 +12,7 @@ import {
     TestCaseReport
 } from "@/models/dto/ReportData";
 import TestCaseReportCard from "@/components/evaluation/test-case-report/test-case-report-card";
-import TextEvaluationSection from "@/components/evaluation/charts/text/text-evaluation-charts";
+import TextEvaluationSection, {ModalityComparisonChart} from "@/components/evaluation/charts/text/text-evaluation-charts";
 import EvaluationReportSummaryCard from "@/components/evaluation/evaluation-report-summary-card";
 import MetricsCharts from "@/components/evaluation/metrics-charts";
 import {Spinner} from "@/components/ui/spinner";
@@ -744,6 +744,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                     />
                                 </div>
                             )}
+                            <ModalityComparisonChart stats={aggregateStats}/>
                             <TextEvaluationSection stats={aggregateStats}/>
                         </>)}
                     </div>

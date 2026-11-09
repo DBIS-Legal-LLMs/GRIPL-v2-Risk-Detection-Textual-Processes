@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {EndpointChoice} from "@/models/evaluation/Config";
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
-import {EVALUATION_MODALITIES, EvaluationModality} from "@/models/dto/MultiEvaluationRequest";
+import {EVALUATION_MODALITIES, EvaluationModality, isScoredOnText} from "@/models/dto/MultiEvaluationRequest";
 import {AlertTriangle} from "lucide-react";
 
 interface EvaluationConfigDefaultSettingsProps {
@@ -50,6 +50,14 @@ const MODALITY_OPTIONS: Record<EvaluationModality, { label: string; description:
         label: "Text Description",
         description: "Analyze the textual process description and score it against its labeled passages.",
     },
+    BPMN_WITH_TEXT: {
+        label: "BPMN Model + Text (model-centric)",
+        description: "Analyze the BPMN model with the text description as additional context; scored like BPMN.",
+    },
+    TEXT_WITH_BPMN: {
+        label: "Text + BPMN Model (text-centric)",
+        description: "Analyze the text description with the BPMN model as extraction reference; scored like text.",
+    },
 };
 
 const RAG_MODES = [
@@ -89,13 +97,15 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
         setPairedOnly,
     } = props;
 
-    // Keeps the canonical order (BPMN, TEXT) and at least one modality selected
+    // Keeps the canonical order (BPMN, TEXT, BPMN+TEXT, TEXT+BPMN) and at least one modality selected
     function toggleModality(modality: EvaluationModality, checked: boolean) {
         const next = EVALUATION_MODALITIES.filter((m) => (m === modality ? checked : modalities.includes(m)));
         if (next.length > 0) setModalities(next);
     }
 
     const comparesModalities = modalities.length > 1;
+    // Text-scored modalities consist of activities only, BPMN-scored ones also score other element types
+    const mixesScoringTargets = modalities.some(isScoredOnText) && modalities.some((m) => !isScoredOnText(m));
 
     return (
         <Card>
@@ -178,7 +188,8 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                         <p className="text-sm font-medium">Modalities</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                             Which representation of each process is analyzed. With several modalities, every model
-                            is evaluated once per modality and appears as &quot;Model [BPMN]&quot; / &quot;Model [TEXT]&quot;.
+                            is evaluated once per modality and appears as &quot;Model [BPMN]&quot;, &quot;Model [TEXT]&quot;,
+                            &quot;Model [BPMN+TEXT]&quot; or &quot;Model [TEXT+BPMN]&quot;.
                         </p>
                     </div>
 
@@ -206,7 +217,7 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                             <div>
                                 <Label htmlFor="paired-only-toggle">Paired Test Cases Only</Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Evaluate only test cases with both a BPMN model and a labeled text, so the
+                                    Evaluate only test cases providing every selected modality, so the
                                     modalities are compared on exactly the same processes.
                                 </p>
                             </div>
@@ -218,7 +229,7 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                         </div>
                     )}
 
-                    {comparesModalities && !activitiesOnly && (
+                    {mixesScoringTargets && !activitiesOnly && (
                         <div className="flex gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
                             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500"/>
                             <p>
@@ -232,8 +243,8 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                         <div className="flex gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
                             <AlertTriangle className="h-4 w-4 shrink-0 text-destructive"/>
                             <p>
-                                The text modality is only available for the prompt-engineering analysis and the
-                                baseline. The run will be rejected, as these models use a custom endpoint:{" "}
+                                The text and combined modalities are only available for the prompt-engineering
+                                analysis and the baseline. The run will be rejected, as these models use a custom endpoint:{" "}
                                 {textIncompatibleModels.join(", ")}.
                             </p>
                         </div>

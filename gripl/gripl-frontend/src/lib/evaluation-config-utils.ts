@@ -67,12 +67,12 @@ export function pruneNulls<T>(obj: T): T {
     return obj as T;
 }
 
-// BPMN analysis approaches with a text counterpart (two-step text pipeline and text baseline)
-const TEXT_CAPABLE_ENDPOINTS = ["/gdpr/analysis/prompt-engineering", "/gdpr/analysis/baseline"];
+// BPMN analysis approaches with a counterpart for the text and the combined modalities (GRIPL and baseline)
+const MODALITY_CAPABLE_ENDPOINTS = ["/gdpr/analysis/prompt-engineering", "/gdpr/analysis/baseline"];
 
-// The backend rejects other (custom) endpoints for the text modality before the run starts, as their text
+// The backend rejects other (custom) endpoints for all modalities except BPMN before the run starts, as their
 // counterpart is unknown
-export function isTextCapableEndpoint(endpoint: string | null | undefined): boolean {
+export function hasModalityCounterparts(endpoint: string | null | undefined): boolean {
     const normalized = endpoint?.trim().replace(/\/+$/, "");
-    return !!normalized && TEXT_CAPABLE_ENDPOINTS.some((e) => normalized.endsWith(e));
+    return !!normalized && MODALITY_CAPABLE_ENDPOINTS.some((e) => normalized.endsWith(e));
 }

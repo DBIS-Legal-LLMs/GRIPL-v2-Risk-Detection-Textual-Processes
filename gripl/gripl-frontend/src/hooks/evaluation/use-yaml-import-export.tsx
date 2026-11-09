@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { dump as yamlDump, load as yamlLoad } from "js-yaml";
-import { EVALUATION_MODALITIES, EvaluationModality, MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
+import { EVALUATION_MODALITIES, EvaluationModality, MODALITY_LABELS, MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
 import {ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, findPreset, normalize, pruneNulls} from "@/lib/evaluation-config-utils";
 import {useToast} from "@/components/ui/toast";
@@ -127,9 +127,13 @@ export function useYamlImportExport(props: {
         if (typeof cfg?.evaluateRag === "boolean") setEvaluateRag(cfg.evaluateRag);
         if (typeof cfg?.activitiesOnly === "boolean") setActivitiesOnly(cfg.activitiesOnly);
 
-        // Missing in older configs: the backend then evaluates BPMN only, so the form follows that default
+        // Missing in older configs: the backend then evaluates BPMN only, so the form follows that default.
+        // Accepts the enum name (BPMN_WITH_TEXT) and the run label suffix (BPMN+TEXT)
         const importedModalities: EvaluationModality[] = Array.isArray(cfg?.modalities)
-            ? EVALUATION_MODALITIES.filter((m) => cfg.modalities.some((v: any) => String(v).toUpperCase() === m))
+            ? EVALUATION_MODALITIES.filter((m) => cfg.modalities.some((v: any) => {
+                const value = String(v).trim().toUpperCase();
+                return value === m || value === MODALITY_LABELS[m];
+            }))
             : [];
         setModalities(importedModalities.length > 0 ? importedModalities : ["BPMN"]);
         setPairedOnly(cfg?.pairedOnly === true);
