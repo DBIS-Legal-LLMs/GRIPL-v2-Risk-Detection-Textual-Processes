@@ -6,14 +6,12 @@ import de.mertendieckmann.griplbackend.evaluation.service.EvaluationCallResult
 import de.mertendieckmann.griplbackend.evaluation.service.Evaluator
 import de.mertendieckmann.griplbackend.evaluation.service.RagasEvaluationService
 import de.mertendieckmann.griplbackend.evaluation.text.FalseNegativeCause
-import de.mertendieckmann.griplbackend.evaluation.text.textAnalysisEndpointFor
 import de.mertendieckmann.griplbackend.model.dto.*
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito.mock
 
 /** The text modality of the EvaluationRunner end-to-end, with a fake evaluator instead of an LLM. */
@@ -52,22 +50,25 @@ class TextEvaluationRunnerTest {
 
     private class FakeEvaluator(val response: AnalysisResponse) : Evaluator {
         val texts = mutableListOf<String>()
-        override suspend fun evaluate(bpmnXml: String, evaluationRequest: EvaluationRequest) =
-            error("BPMN must not be evaluated in a text run")
-
-        override suspend fun evaluateText(processText: String, evaluationRequest: EvaluationRequest): EvaluationCallResult {
-            texts += processText
+        val models = mutableListOf<String?>()
+        override suspend fun evaluate(bpmnXml: String?, processText: String?, evaluationRequest: EvaluationRequest): EvaluationCallResult {
+            texts += requireNotNull(processText) { "A text run must send the process text" }
+            models += bpmnXml
             return EvaluationCallResult(response.criticalElements.map { ExpectedValue(it.id, it.reason) }, 0, response)
         }
     }
 
-    private fun run(response: AnalysisResponse, testCases: List<EvaluationData> = listOf(testCase)): Pair<FakeEvaluator, List<EvaluationReport>> {
+    private fun run(
+        response: AnalysisResponse,
+        testCases: List<EvaluationData> = listOf(testCase),
+        modality: EvaluationModality = EvaluationModality.TEXT
+    ): Pair<FakeEvaluator, List<EvaluationReport>> {
         val evaluator = FakeEvaluator(response)
         val repository = mock(EvaluationDataRepository::class.java) { invocation ->
             if (invocation.method.name.startsWith("getEvaluationData")) testCases else null
         }
         val runner = EvaluationRunner(repository, evaluator, mock(RagasEvaluationService::class.java))
-        val request = EvaluationRequest(datasets = listOf(1), evaluateRag = false, modality = EvaluationModality.TEXT)
+        val request = EvaluationRequest(datasets = listOf(1), evaluateRag = false, modality = modality)
         return evaluator to runBlocking { runner.run(request).toList() }
     }
 
@@ -75,6 +76,7 @@ class TextEvaluationRunnerTest {
     fun `scores the text test case and reports partial and strict results`() {
         val (evaluator, reports) = run(response(p3Critical = false))
         assertEquals(listOf(text), evaluator.texts)
+        assertEquals(listOf<String?>(null), evaluator.models)
 
         val report = reports.filterIsInstance<TestCaseReport>().single()
         assertNull(report.imageSrc)
@@ -140,11 +142,13 @@ class TextEvaluationRunnerTest {
     }
 
     @Test
-    fun `text endpoint is derived from the BPMN endpoint`() {
-        assertEquals("/gdpr/analysis/text", textAnalysisEndpointFor("/gdpr/analysis/prompt-engineering"))
-        assertEquals("https://host:8080/gdpr/analysis/text", textAnalysisEndpointFor("https://host:8080/gdpr/analysis/prompt-engineering/"))
-        assertEquals("/gdpr/analysis/text-baseline", textAnalysisEndpointFor("/gdpr/analysis/baseline"))
-        assertEquals("http://localhost:8081/gdpr/analysis/text-baseline", textAnalysisEndpointFor("http://localhost:8081/gdpr/analysis/baseline"))
-        assertThrows<IllegalArgumentException> { textAnalysisEndpointFor("https://example.com/analyze") }
+    fun `TEXT+BPMN sends the model as reference and is scored like text`() {
+        val paired = testCase.copy(bpmnXml = "<xml/>")
+        val (evaluator, reports) = run(response(p3Critical = false), listOf(paired), EvaluationModality.TEXT_WITH_BPMN)
+
+        assertEquals(listOf<String?>("<xml/>"), evaluator.models)
+        val report = reports.filterIsInstance<TestCaseReport>().single()
+        assertEquals(listOf("g1", "g2"), report.correctActivityIds)
+        assertNotNull(report.textResult)
     }
 }

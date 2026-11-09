@@ -73,9 +73,11 @@ class EvaluationRunner(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome = try {
-        when (evaluationRequest.modality) {
-            EvaluationModality.BPMN -> evaluateEntryOrFailFast(entry, evaluationRequest)
-            EvaluationModality.TEXT -> evaluateTextEntryOrFailFast(entry, evaluationRequest)
+        // Text-scored modalities are scored against the text labels, the others against the BPMN labels
+        if (evaluationRequest.modality.scoredOnText) {
+            evaluateTextEntryOrFailFast(entry, evaluationRequest)
+        } else {
+            evaluateEntryOrFailFast(entry, evaluationRequest)
         }
     } catch (e: Exception) {
         EvaluationOutcome.Error(
@@ -102,15 +104,19 @@ class EvaluationRunner(
         )
 
     /**
-     * Text modality: analyzes the process text and scores the extracted activities against the text labels by position
-     * (see [scoreText]). The main metrics use partial matching, strict matching is reported alongside.
+     * Text modality (and TEXT+BPMN, which also sends the model as a reference): analyzes the process text and scores the
+     * extracted activities against the text labels by position (see [scoreText]). The main metrics use partial
+     * matching, strict matching is reported alongside.
      */
     private suspend fun evaluateTextEntryOrFailFast(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome {
         val processText = requireNotNull(entry.processText) { "Test case ${entry.id} has no process text" }
-        val actualResult = evaluator.evaluateText(processText, evaluationRequest)
+        val bpmnXml = if (evaluationRequest.modality == EvaluationModality.TEXT_WITH_BPMN) {
+            requireNotNull(entry.bpmnXml) { "Test case ${entry.id} has no BPMN model" }
+        } else null
+        val actualResult = evaluator.evaluate(bpmnXml, processText, evaluationRequest)
         val response = actualResult.analysisResponse
 
         if (evaluationRequest.evaluateRag && response.ragPromptContext == null) {
@@ -177,7 +183,11 @@ class EvaluationRunner(
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome {
         val bpmnXml = requireNotNull(entry.bpmnXml) { "Test case ${entry.id} has no BPMN model" }
-        val actualResult = evaluator.evaluate(bpmnXml, evaluationRequest)
+        // BPMN+TEXT also sends the text as context; scoring is the same as for BPMN
+        val processText = if (evaluationRequest.modality == EvaluationModality.BPMN_WITH_TEXT) {
+            requireNotNull(entry.processText) { "Test case ${entry.id} has no process text" }
+        } else null
+        val actualResult = evaluator.evaluate(bpmnXml, processText, evaluationRequest)
 
         if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragPromptContext == null) {
             return ragContextMissingError(entry, evaluationRequest)

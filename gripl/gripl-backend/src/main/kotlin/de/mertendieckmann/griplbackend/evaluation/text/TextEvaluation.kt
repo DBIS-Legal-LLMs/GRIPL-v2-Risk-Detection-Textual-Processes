@@ -12,31 +12,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val log = KotlinLogging.logger {}
 
-const val PROMPT_ENGINEERING_ENDPOINT = "/gdpr/analysis/prompt-engineering"
-const val BASELINE_ENDPOINT = "/gdpr/analysis/baseline"
-const val TEXT_ANALYSIS_ENDPOINT = "/gdpr/analysis/text"
-const val TEXT_BASELINE_ENDPOINT = "/gdpr/analysis/text-baseline"
-
-// Each BPMN analysis approach and its text counterpart
-private val TEXT_ENDPOINTS = mapOf(
-    PROMPT_ENGINEERING_ENDPOINT to TEXT_ANALYSIS_ENDPOINT,
-    BASELINE_ENDPOINT to TEXT_BASELINE_ENDPOINT,
-)
-
-/**
- * The text analysis endpoint for a model whose BPMN endpoint is [bpmnEndpoint]: the prompt-engineering approach maps
- * to the two-step text pipeline, the baseline to the text baseline (relative or absolute, keeping host and port).
- * Any other (custom) endpoint is rejected, as its text counterpart is unknown.
- */
-fun textAnalysisEndpointFor(bpmnEndpoint: String): String {
-    val endpoint = bpmnEndpoint.trimEnd('/')
-    val (bpmnPath, textPath) = requireNotNull(TEXT_ENDPOINTS.entries.firstOrNull { endpoint.endsWith(it.key) }) {
-        "The text modality is only available for the prompt-engineering analysis ($PROMPT_ENGINEERING_ENDPOINT) and " +
-            "the baseline ($BASELINE_ENDPOINT), not for '$bpmnEndpoint'"
-    }
-    return endpoint.removeSuffix(bpmnPath) + textPath
-}
-
 /**
  * Predictions of a text analysis: every extracted activity, critical when the classification returned it.
  * Responses without [AnalysisResponse.extractedActivities] (older backends) fall back to the critical elements only;

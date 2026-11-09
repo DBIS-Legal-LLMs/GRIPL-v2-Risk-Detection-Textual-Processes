@@ -1,6 +1,5 @@
 package de.mertendieckmann.griplbackend.evaluation
 
-import de.mertendieckmann.griplbackend.evaluation.text.textAnalysisEndpointFor
 import de.mertendieckmann.griplbackend.model.dto.EvaluationMetadataReport
 import de.mertendieckmann.griplbackend.model.dto.EvaluationModality
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
@@ -28,13 +27,14 @@ class MultiEvaluationRunner(
         require(request.modalities.isNotEmpty()) { "modalities must not be empty" }
 
         val modalities = request.modalities.distinct()
-        if (EvaluationModality.TEXT in modalities) {
-            // Fail before the run starts: text counterparts exist only for the prompt-engineering analysis and the baseline
-            request.models.forEach { textAnalysisEndpointFor(it.evaluationEndpoint ?: request.defaultEvaluationEndpoint) }
-            if (EvaluationModality.BPMN in modalities && !request.activitiesOnly) {
-                log.warn { "Comparing BPMN with TEXT without activitiesOnly: BPMN also scores events, gateways and data " +
-                    "objects, while text consists of activities only - set activitiesOnly for a fair comparison" }
-            }
+        // Fail before the run starts: the non-BPMN modalities exist only for the prompt-engineering analysis and the
+        // baseline (custom endpoints have no known counterpart)
+        modalities.filter { it != EvaluationModality.BPMN }.forEach { modality ->
+            request.models.forEach { analysisEndpointFor(modality, it.evaluationEndpoint ?: request.defaultEvaluationEndpoint) }
+        }
+        if (modalities.any { it.scoredOnText } && modalities.any { !it.scoredOnText } && !request.activitiesOnly) {
+            log.warn { "Comparing BPMN- and text-scored modalities without activitiesOnly: BPMN also scores events, " +
+                "gateways and data objects, while text consists of activities only - set activitiesOnly for a fair comparison" }
         }
         val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
         val repetitions = request.repetitions.coerceAtLeast(1)

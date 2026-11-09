@@ -1,7 +1,8 @@
 package de.mertendieckmann.griplbackend.evaluation.service
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import de.mertendieckmann.griplbackend.evaluation.text.textAnalysisEndpointFor
+import de.mertendieckmann.griplbackend.evaluation.analysisEndpointFor
+import de.mertendieckmann.griplbackend.model.dto.EvaluationModality
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.ExpectedValue
@@ -24,24 +25,27 @@ class HttpEvaluator(
         .codecs { it.defaultCodecs().maxInMemorySize(32 * 1024 * 1024) }
         .build()
 
-    override suspend fun evaluate(bpmnXml: String, evaluationRequest: EvaluationRequest): EvaluationCallResult {
+    override suspend fun evaluate(bpmnXml: String?, processText: String?, evaluationRequest: EvaluationRequest): EvaluationCallResult {
+        require(bpmnXml != null || processText != null) { "Nothing to analyze: neither BPMN model nor process text" }
+        val modality = evaluationRequest.modality
         val bodyBuilder = MultipartBodyBuilder()
-        bodyBuilder.part("bpmnFile", ByteArrayResource(bpmnXml.toByteArray()))
-            .header("Content-Disposition", "form-data; name=\"bpmnFile\"; filename=\"process.bpmn\"")
-            .contentType(MediaType.APPLICATION_XML)
+        if (bpmnXml != null) {
+            bodyBuilder.part("bpmnFile", ByteArrayResource(bpmnXml.toByteArray()))
+                .header("Content-Disposition", "form-data; name=\"bpmnFile\"; filename=\"process.bpmn\"")
+                .contentType(MediaType.APPLICATION_XML)
+        }
+        if (processText != null) {
+            // Plain form field: the text endpoints read processText as form field part
+            bodyBuilder.part("processText", processText)
+        }
         addAnalysisParameters(bodyBuilder, evaluationRequest)
-        bodyBuilder.part("activitiesOnly", evaluationRequest.activitiesOnly.toString())
+        // The activities-only scope applies to the BPMN-scored analyses; the text pipeline is activities-only anyway
+        if (!modality.scoredOnText) {
+            bodyBuilder.part("activitiesOnly", evaluationRequest.activitiesOnly.toString())
+        }
 
-        return post(evaluationRequest.evaluationEndpoint, bodyBuilder, "BPMN XML")
-    }
-
-    override suspend fun evaluateText(processText: String, evaluationRequest: EvaluationRequest): EvaluationCallResult {
-        val bodyBuilder = MultipartBodyBuilder()
-        // Plain form field: the text endpoint reads processText as form field part
-        bodyBuilder.part("processText", processText)
-        addAnalysisParameters(bodyBuilder, evaluationRequest)
-
-        return post(textAnalysisEndpointFor(evaluationRequest.evaluationEndpoint), bodyBuilder, "process text")
+        val inputName = if (modality == EvaluationModality.BPMN) "BPMN XML" else "${modality.label} input"
+        return post(analysisEndpointFor(modality, evaluationRequest.evaluationEndpoint), bodyBuilder, inputName)
     }
 
     private fun addAnalysisParameters(bodyBuilder: MultipartBodyBuilder, evaluationRequest: EvaluationRequest) {

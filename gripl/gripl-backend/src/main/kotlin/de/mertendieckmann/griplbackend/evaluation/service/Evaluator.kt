@@ -21,14 +21,10 @@ data class EvaluationCallResult(
 interface Evaluator {
 
     /**
-     * Evaluates the given BPMN XML using the specified evaluation request.
+     * Analyzes a test case with the analysis matching the request's modality and endpoint
+     * ([de.mertendieckmann.griplbackend.evaluation.analysisEndpointFor]): BPMN sends [bpmnXml], TEXT [processText],
+     * the combined modalities both.
      */
     @Throws(Exception::class)
-    suspend fun evaluate(bpmnXml: String, evaluationRequest: EvaluationRequest): EvaluationCallResult
-
-    /**
-     * Evaluates the given textual process description with the text analysis matching the request's endpoint.
-     */
-    @Throws(Exception::class)
-    suspend fun evaluateText(processText: String, evaluationRequest: EvaluationRequest): EvaluationCallResult
+    suspend fun evaluate(bpmnXml: String?, processText: String?, evaluationRequest: EvaluationRequest): EvaluationCallResult
 }
