@@ -7,7 +7,8 @@ import de.mertendieckmann.griplbackend.model.dto.TextLabel
  * labeled passages ([TextLabel]) of a test case. Text has no stable element ids like BPMN, so predictions and labels
  * are compared by their position in the process text, in four steps:
  *
- * 1. **Locate** – the quoted passage ([PredictedActivity.exactText]) of every prediction is searched in the text.
+ * 1. **Locate** – the quoted passage ([PredictedActivity.exactText]) of every prediction is searched in the text,
+ *    tolerating small deviations of the quote ([locatePassage]).
  * 2. **Match** – predicted and labeled spans are paired one-to-one by overlap ([MatchMode]).
  * 3. **Classify** – every label is a unit of the confusion matrix (like a BPMN element): TP/FN for critical labels,
  *    FP/TN for non-critical ones. Critical predictions without a matched label are additional FPs.
@@ -117,9 +118,17 @@ data class TextScoringResult(
 }
 
 /**
- * Finds [passage] in [text]: exact match first, then a lenient match that ignores case and whitespace differences
- * (LLM quotes sometimes deviate slightly). Occurrences in [occupied] are skipped, so a passage quoted twice maps to
- * two different occurrences. Returns null if the passage cannot be found.
+ * Finds [passage] in [text], in increasingly lenient stages, because LLM quotes often deviate slightly from their
+ * source:
+ * 1. exact match,
+ * 2. ignoring case and whitespace differences,
+ * 3. additionally ignoring punctuation at the edges of the passage (e.g. an added final period),
+ * 4. word-based ([locateByWords]): the text window whose words agree best with the passage — catches reordered
+ *    quotes (German word order "überarbeitet sie die Daten" quoted as "sie überarbeitet die Daten"), an added subject
+ *    or an inflected verb, but not paraphrases.
+ *
+ * Occurrences in [occupied] are skipped, so a passage quoted twice maps to two different occurrences. Returns null if
+ * the passage cannot be found.
  */
 fun locatePassage(text: String, passage: String, occupied: Set<TextSpan> = emptySet()): TextSpan? {
     val trimmed = passage.trim()
@@ -132,10 +141,67 @@ fun locatePassage(text: String, passage: String, occupied: Set<TextSpan> = empty
         index = text.indexOf(trimmed, index + 1)
     }
 
-    val pattern = trimmed.split(Regex("\\s+")).joinToString("\\s+") { Regex.escape(it) }
-    return Regex(pattern, RegexOption.IGNORE_CASE).findAll(text)
-        .map { TextSpan(it.range.first, it.range.last + 1) }
-        .firstOrNull { it !in occupied }
+    val withoutEdgePunctuation = trimmed.trim { !it.isLetterOrDigit() }
+    return sequenceOf(trimmed, withoutEdgePunctuation)
+        .filter { it.isNotEmpty() }
+        .firstNotNullOfOrNull { candidate ->
+            val pattern = candidate.split(Regex("\\s+")).joinToString("\\s+") { Regex.escape(it) }
+            Regex(pattern, RegexOption.IGNORE_CASE).findAll(text)
+                .map { TextSpan(it.range.first, it.range.last + 1) }
+                .firstOrNull { it !in occupied }
+        }
+        ?: locateByWords(text, trimmed, occupied)
+}
+
+/** Word-based locating (stage 4 of [locatePassage]); see the constants for its limits. */
+object WordLocating {
+    /** Shorter passages are only located literally — too few words to tell a match from a coincidence. */
+    const val MIN_WORDS = 3
+
+    /** Minimum share of agreeing words, relative to the longer of passage and window. */
+    const val MIN_AGREEMENT = 0.8
+
+    /** The window may be up to this many words shorter or longer than the passage (added or omitted words). */
+    const val LENGTH_SLACK = 2
+
+    /** Words are compared by their first characters, so inflected forms agree ("answers" / "answered"). */
+    const val STEM_LENGTH = 5
+}
+
+private data class Word(val stem: String, val start: Int, val end: Int)
+
+private fun words(text: String): List<Word> =
+    Regex("[\\p{L}\\p{N}]+").findAll(text).map {
+        Word(it.value.lowercase().take(WordLocating.STEM_LENGTH), it.range.first, it.range.last + 1)
+    }.toList()
+
+/**
+ * Finds the window of words in [text] that agrees best with the words of [passage] (as multisets, so the order does
+ * not matter), accepts it from [WordLocating.MIN_AGREEMENT], and trims words at its edges that do not occur in the
+ * passage. Windows overlapping an [occupied] span are skipped. Ties go to the shorter, then the earlier window.
+ */
+fun locateByWords(text: String, passage: String, occupied: Set<TextSpan> = emptySet()): TextSpan? {
+    val passageWords = words(passage).map { it.stem }
+    if (passageWords.size < WordLocating.MIN_WORDS) return null
+    val passageCounts = passageWords.groupingBy { it }.eachCount()
+    val textWords = words(text)
+
+    var best: Pair<Double, TextSpan>? = null
+    val n = passageWords.size
+    for (size in (n - WordLocating.LENGTH_SLACK).coerceAtLeast(1)..(n + WordLocating.LENGTH_SLACK)) {
+        for (from in 0..textWords.size - size) {
+            val window = textWords.subList(from, from + size)
+            val windowCounts = window.groupingBy { it.stem }.eachCount()
+            val agreeing = windowCounts.entries.sumOf { (stem, count) -> minOf(count, passageCounts[stem] ?: 0) }
+            val agreement = agreeing.toDouble() / maxOf(n, size)
+            if (agreement < WordLocating.MIN_AGREEMENT || agreement <= (best?.first ?: 0.0)) continue
+
+            val trimmed = window.dropWhile { it.stem !in passageCounts }.dropLastWhile { it.stem !in passageCounts }
+            val span = TextSpan(trimmed.first().start, trimmed.last().end)
+            if (occupied.none { it.overlap(span) > 0 }) best = agreement to span
+        }
+    }
+    return best?.second
 }
 
 /** Step 1: locates the passages of all predictions, in order. */

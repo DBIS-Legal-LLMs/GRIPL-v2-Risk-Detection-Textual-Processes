@@ -1,0 +1,41 @@
+# Rerun of the first combined run (experiments/combined_Runs) on the Hospital Processes with explicit sampling settings.
+# The first run had no temperature set (provider default), and gpt-oss-20b produced corrupted JSON (stray tokens such as
+# "vanskelig", "kale?") in 23 of 108 analyses. This run uses the settings of the base paper (openai-models-config.yaml:
+# temperature 0.1, topP 1) and runs after the extraction retries and the revised extraction prompt, to check whether
+# the errors disappear and the extraction gets closer to the labeled activities.
+# Run via the UI (Import YAML) or the CLI, from gripl/gripl-backend:
+#   ./mvnw spring-boot:run "-Dspring-boot.run.arguments=evaluation -c ../../experiments/configurations/hospital-gpt-oss-20b-config.yaml -o hospital-gpt-oss-20b-report.md"
+
+defaultEvaluationEndpoint: /gdpr/analysis/prompt-engineering
+# Same seed as the first combined run, so both runs are comparable
+seed: 123456789
+maxConcurrent: 10
+repetitions: 1
+
+modalities:
+  - BPMN
+  - TEXT
+  - BPMN_WITH_TEXT
+  - TEXT_WITH_BPMN
+# Only test cases with a BPMN model and a labeled text, so all modalities are scored on the same processes
+pairedOnly: true
+# Text consists of activities only; BPMN would otherwise also score events, gateways and data objects
+activitiesOnly: true
+
+useRag: false
+# Set explicitly: the backend defaults to true, which fails every test case when useRag is false
+evaluateRag: false
+
+models:
+  - label: GPT-OSS-20B
+    llmProps:
+      baseUrl: https://openrouter.ai/api/v1
+      modelName: openai/gpt-oss-20b
+      apiKey: ${OPENAI_API_KEY}
+      # Settings of the base paper; without them the provider default applies
+      temperature: 0.1
+      topP: 1
+
+# Hospital Processes
+datasets:
+  - 8

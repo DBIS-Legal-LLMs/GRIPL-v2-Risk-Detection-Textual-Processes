@@ -31,13 +31,16 @@ class TextAnalyzer(
         ragMode: RagMode = RagMode.HYBRID,
         bpmnXml: String? = null
     ): AnalysisResponse {
-        val extraction = extractor.extractActivities(processText, bpmnXml?.let { BpmnExtractor().extractBpmnElements(it) })
+        val (extraction, extractionRetries) =
+            extractor.extractActivitiesWithRetries(processText, bpmnXml?.let { BpmnExtractor().extractBpmnElements(it) })
         val response = elementAnalyzer.analyzeElements(toBpmnElements(extraction), useRag, ragMode, activitiesOnly = true)
 
         // Attach the source passage of each critical activity, so the frontend can highlight it in the text,
         // and the full extraction, so the evaluation can score non-critical activities and the extraction itself
         val exactTextById = extraction.activities.associate { it.id to it.exactText }
         return response.copy(
+            // Retries of both steps (extraction and classification)
+            amountOfRetries = (response.amountOfRetries ?: 0) + extractionRetries,
             criticalElements = response.criticalElements.map { it.copy(exactText = exactTextById[it.id]) },
             extractedActivities = extraction.activities.map {
                 AnalysisResponse.ExtractedActivity(id = it.id, name = it.name, exactText = it.exactText)

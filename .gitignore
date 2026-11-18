@@ -11,6 +11,8 @@
 
 scripts/output/
 CLAUDE.md
+dataset/text_generation/output
+experiments/combined_Runs
 
 # Python
 __pycache__/

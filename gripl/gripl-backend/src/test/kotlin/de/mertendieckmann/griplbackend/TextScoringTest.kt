@@ -96,6 +96,72 @@ class TextScoringTest {
             assertNull(locatePassage("Some text.", "completely different"))
             assertNull(locatePassage("Some text.", "   "))
         }
+
+        // The following cases are quotes of gpt-oss-20b from the first evaluation runs (Hospital, HR)
+
+        @Test
+        fun `added final period is ignored`() {
+            val text = "Ist sie in Ordnung, erteilt die Sachbearbeitung die Genehmigung, und der Vorgang endet."
+            val passage = "erteilt die Sachbearbeitung die Genehmigung"
+            assertEquals(spanOf(text, passage), locatePassage(text, "$passage."))
+        }
+
+        @Test
+        fun `reordered German word order is located`() {
+            val text = "Anschließend überarbeitet sie oder er die Reisedaten. Danach geht es weiter."
+            assertEquals(
+                spanOf(text, "überarbeitet sie oder er die Reisedaten"),
+                locatePassage(text, "sie oder er überarbeitet die Reisedaten")
+            )
+        }
+
+        @Test
+        fun `inflected and reordered quote is located`() {
+            val text = "A rejection ends the process. An interview invitation is answered with a confirmation."
+            assertEquals(
+                spanOf(text, "An interview invitation is answered with a confirmation"),
+                locatePassage(text, "answers an interview invitation with a confirmation")
+            )
+        }
+
+        @Test
+        fun `added subject is tolerated and the quote is matched to its label`() {
+            val text = "After that, the caregiver holds the discharge conversation with the patient and goes " +
+                "through the paperwork and the following steps with the patient."
+            val labels = listOf(
+                label(text, "talk", "holds the discharge conversation with the patient", true),
+                label(text, "paperwork", "goes through the paperwork and the following steps with the patient", true),
+            )
+            val result = scoreText(text, labels, listOf(
+                PredictedActivity("p", "The caregiver goes through the paperwork and the following steps with the patient.", true)
+            ))
+            // The window boundaries may be off by a word, the overlap still decides for the right label
+            assertEquals(mapOf("paperwork" to "p"), result.matches.associate { it.labelId to it.predictionId })
+        }
+
+        @Test
+        fun `paraphrase and short passages are not located by words`() {
+            val text = "Danach wird eine Bestätigung versendet. Sie gibt Kürzungen an."
+            assertNull(locatePassage(text, "Die Bestätigung wird verschickt"))
+            // Two words only: located literally or not at all
+            assertNull(locatePassage(text, "Kürzungen sie"))
+        }
+
+        @Test
+        fun `word-based locating skips occupied passages`() {
+            val text = "Fällt eine Übernachtung an, erfasst sie diese. Fallen Nebenkosten an, erfasst sie diese."
+            val located = locateActivities(text, listOf(
+                PredictedActivity("a", "sie erfasst diese", false),
+                PredictedActivity("b", "sie erfasst diese", false),
+            ))
+            assertEquals(listOf(TextSpan(28, 45), TextSpan(70, 87)), located.map { it.span })
+        }
+
+        private fun spanOf(text: String, passage: String): TextSpan {
+            val start = text.indexOf(passage)
+            require(start >= 0) { "'$passage' not in text" }
+            return TextSpan(start, start + passage.length)
+        }
     }
 
     @Nested

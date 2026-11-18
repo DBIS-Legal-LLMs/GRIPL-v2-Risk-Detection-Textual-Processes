@@ -15,9 +15,8 @@ import java.util.UUID
  * out of BPMN XML, this class asks the LLM to identify the equivalent "elements" (process activities) out of a
  * free-text process description, since plain text has no structural markup to parse them from.
  *
- * This is deliberately minimal for now (no RAG, no retry-on-parse-failure via SafetyNet) — it exists to test
- * extraction quality in isolation before Step 2 (GDPR classification, reusing the existing BPMN analysis
- * pipeline on the extracted activities) is wired up.
+ * No RAG. An output that cannot be parsed is retried with a fresh call ([retryOnOutputParsingFailure]), as often as
+ * the [SafetyNet] retries the classification.
  */
 class TextActivityExtractor(
     private val llm: ChatModel
@@ -30,12 +29,21 @@ class TextActivityExtractor(
      * With [bpmnElements] (text-centric (Combi Analysis TEXT+BPMN)), the model's activities are appended to the text as a
      * reference ([ProcessModelContext]); without them, the call is exactly the text-only extraction.
      */
-    fun extractActivities(processText: String, bpmnElements: Set<BpmnElement>? = null): TextExtractionResult {
-        val sessionId = UUID.randomUUID().toString()
+    fun extractActivities(processText: String, bpmnElements: Set<BpmnElement>? = null): TextExtractionResult =
+        extractActivitiesWithRetries(processText, bpmnElements).first
+
+    /** Like [extractActivities], plus the number of retries the extraction took. */
+    fun extractActivitiesWithRetries(
+        processText: String,
+        bpmnElements: Set<BpmnElement>? = null
+    ): Pair<TextExtractionResult, Int> {
         val userMessage = bpmnElements?.let { ProcessModelContext.appendTo(processText, it) } ?: processText
-        val result = extractionAiService.extract(sessionId, userMessage)
-        
-        log.info { "Text Extraction Result: $result" }
+        val result = retryOnOutputParsingFailure {
+            // A new session per attempt, so a retry does not see the broken output
+            extractionAiService.extract(UUID.randomUUID().toString(), userMessage)
+        }
+
+        log.info { "Text Extraction Result: ${result.first} (retries: ${result.second})" }
 
         return result
     }

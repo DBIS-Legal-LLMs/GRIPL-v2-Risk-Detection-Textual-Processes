@@ -89,7 +89,7 @@ export default function FlipAnalysisSection({testCasesByRun}: FlipAnalysisSectio
             chartId="flip-analysis-chart"
             title="Flips by Kind"
             description="Changed decisions per model and comparison, improvements (cool) and deteriorations (warm), mean ± SD per run"
-            categories={comparisons.map((c) => `${c.model} (${comparisonName(c)})`)}
+            categories={comparisons.map((c) => [c.model, comparisonName(c)])}
             yTitle="Flips per run"
             decimals={1}
             series={FLIP_KINDS.map((kind) => ({

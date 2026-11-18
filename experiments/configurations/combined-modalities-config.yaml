@@ -1,0 +1,55 @@
+# Combined run: every model on the BPMN model, on the text, and on both combinations of the same processes.
+#   BPMN            the BPMN model alone                                         scored on the BPMN labels
+#   TEXT            the textual description alone                                scored on the text labels
+#   BPMN_WITH_TEXT  model-centric: the BPMN model, the whole text as context     scored on the BPMN labels
+#   TEXT_WITH_BPMN  text-centric: the text, the BPMN model as extraction reference (only the extraction step
+#                   sees the model)                                              scored on the text labels
+# Results appear per model as "<label> [BPMN]", "[TEXT]", "[BPMN+TEXT]" and "[TEXT+BPMN]". The UI compares them in
+# the chart "Modalities per Model"; the "Flip Analysis" shows which decisions change from BPMN to BPMN+TEXT (per
+# element) and from TEXT to TEXT+BPMN (per labeled passage), for the same model, run and test case.
+# Run via the UI (Import YAML) or the CLI, from gripl/gripl-backend:
+#   ./mvnw spring-boot:run "-Dspring-boot.run.arguments=evaluation -c ../../experiments/configurations/combined-modalities-config.yaml -o combined-modalities-report.md"
+
+# Every modality has a counterpart of the prompt-engineering analysis (GRIPL) and of the baseline; the endpoint of a
+# model selects which one runs. Custom endpoints are rejected for all modalities except BPMN before the run starts.
+defaultEvaluationEndpoint: /gdpr/analysis/prompt-engineering
+seed: 24523833
+maxConcurrent: 10
+repetitions: 5
+
+# Order of the runs and the bars per model. The YAML also accepts the labels (BPMN+TEXT, TEXT+BPMN)
+modalities:
+  - BPMN
+  - TEXT
+  - BPMN_WITH_TEXT
+  - TEXT_WITH_BPMN
+# Only test cases with a BPMN model and a labeled text, so all modalities are scored on the same processes
+pairedOnly: true
+# Text consists of activities only; BPMN would otherwise also score events, gateways and data objects
+activitiesOnly: true
+
+useRag: false
+# Set explicitly: the backend defaults to true, which fails every test case when useRag is false
+evaluateRag: false
+
+models:
+  - label: GPT-4o
+    llmProps:
+      baseUrl: https://openrouter.ai/api/v1
+      modelName: openai/gpt-4o-2024-11-20
+      apiKey: ${OPENAI_API_KEY}
+      temperature: 0.1
+      topP: 1
+  # The same model with the baseline of every modality (no GRIPL prompt engineering, no RAG)
+  - label: GPT-4o Baseline
+    evaluationEndpoint: /gdpr/analysis/baseline
+    llmProps:
+      baseUrl: https://openrouter.ai/api/v1
+      modelName: openai/gpt-4o-2024-11-20
+      apiKey: ${OPENAI_API_KEY}
+      temperature: 0.1
+      topP: 1
+
+# Datasets containing the paired test cases (model and text must describe the same process)
+datasets:
+  - 1

@@ -20,7 +20,8 @@ interface TextBarChartProps {
     chartId: string;
     title: string;
     description: string;
-    categories: string[];
+    // a category given as several lines (e.g. [model, comparison]) is drawn multi-line and not rotated
+    categories: (string | string[])[];
     series: TextBarSeries[];
     yTitle: string;
     stacked?: boolean;
@@ -55,13 +56,14 @@ export default function TextBarChart({
         colors: series.map((s) => s.color),
         xaxis: {
             categories,
-            labels: {rotate: -42, rotateAlways: categories.length > 3, style: {fontSize: "10px"}, trim: true},
+            labels: {rotate: -42, rotateAlways: categories.length > 3 && categories.every((c) => typeof c === "string"), style: {fontSize: "10px"}, trim: true},
         },
         yaxis: {
             min: 0,
             max: yMax,
             title: {text: yTitle, style: {fontSize: "10px", fontWeight: 400}},
-            labels: {style: {fontSize: "10px"}, formatter: (v) => v.toFixed(yMax === 1 ? 1 : 0)},
+            // counts as whole numbers; fractional ticks (means below a few counts) keep one decimal instead of rounding
+            labels: {style: {fontSize: "10px"}, formatter: (v) => v.toFixed(yMax === 1 || !Number.isInteger(v) ? 1 : 0)},
         },
         grid: {borderColor: chartTheme.gridColor, strokeDashArray: 4},
         legend: {show: series.length > 1, position: "bottom", horizontalAlign: "center"},

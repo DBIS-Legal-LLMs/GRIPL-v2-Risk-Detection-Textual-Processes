@@ -4,6 +4,7 @@ import de.mertendieckmann.griplbackend.ai.BaselineTextAnalysisAiServiceFactory
 import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.application.ProcessModelContext
+import de.mertendieckmann.griplbackend.application.retryOnOutputParsingFailure
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.text.TextBaselineResult
 import dev.langchain4j.model.chat.ChatModel
@@ -31,9 +32,10 @@ class BaselineTextAnalyzer(
         }
         val userMessage = bpmnXml?.let { ProcessModelContext.appendTo(processText, BpmnExtractor().extractBpmnElements(it)) }
             ?: processText
-        val result = aiService.analyze(UUID.randomUUID().toString(), userMessage)
-        log.info { "Text Baseline Result: $result" }
-        return toAnalysisResponse(result)
+        // A fresh call per attempt, like the extraction of the GRIPL pipeline (the BPMN baseline has the SafetyNet)
+        val (result, retries) = retryOnOutputParsingFailure { aiService.analyze(UUID.randomUUID().toString(), userMessage) }
+        log.info { "Text Baseline Result: $result (retries: $retries)" }
+        return toAnalysisResponse(result).copy(amountOfRetries = retries)
     }
 
     companion object {
