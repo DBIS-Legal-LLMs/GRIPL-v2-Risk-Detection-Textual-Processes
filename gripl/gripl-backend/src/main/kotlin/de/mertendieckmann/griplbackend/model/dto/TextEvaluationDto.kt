@@ -3,8 +3,8 @@ package de.mertendieckmann.griplbackend.model.dto
 import com.fasterxml.jackson.annotation.JsonProperty
 import de.mertendieckmann.griplbackend.evaluation.text.FalseNegativeCause
 
-/** Outcome of one text label in the confusion matrix; IGNORED for orphaned labels that are not scored. */
-enum class TextLabelOutcome { TP, FP, FN, TN, IGNORED }
+/** Outcome of one text label in the confusion matrix; IGNORED for orphaned labels, NEUTRAL for neutral labels (not scored). */
+enum class TextLabelOutcome { TP, FP, FN, TN, IGNORED, NEUTRAL }
 
 /**
  * Details of a text test case for reports and the frontend preview: the text, every label with its outcome and every
@@ -22,6 +22,8 @@ data class TextTestCaseResult(
     val meanIou: Double,
     val falseNegativesByExtraction: Int,
     val falseNegativesByClassification: Int,
+    /** Critical predictions inside neutral labels, not counted as false positives. */
+    val neutralHits: Int,
     val strict: TextStrictResult
 )
 
@@ -33,6 +35,7 @@ data class TextLabelResult(
     @get:JsonProperty("isCritical")
     val isCritical: Boolean,
     val reason: String?,
+    val kind: TextLabelKind,
     val outcome: TextLabelOutcome,
     val falseNegativeCause: FalseNegativeCause?,
     val matchedPredictionId: String?,
@@ -50,7 +53,9 @@ data class TextPredictionResult(
     /** Position of the quoted passage in the text, null if it could not be located. */
     val start: Int?,
     val end: Int?,
-    val matchedLabelId: String?
+    val matchedLabelId: String?,
+    /** Not matched to an activity label, but inside a neutral label: not scored. */
+    val inNeutralLabel: Boolean = false
 )
 
 data class TextStrictResult(
@@ -76,5 +81,7 @@ data class TextSummaryMetrics(
     val meanIou: Double,
     val falseNegativesByExtraction: Int,
     val falseNegativesByClassification: Int,
+    /** Critical predictions inside neutral labels, not counted as false positives. */
+    val neutralHits: Int,
     val strict: TextStrictResult
 )

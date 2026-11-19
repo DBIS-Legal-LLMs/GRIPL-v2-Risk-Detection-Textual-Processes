@@ -2,7 +2,7 @@
 
 import {ReactNode, useMemo, useRef} from "react";
 import {TextLabel} from "@/models/dto/EvaluationData";
-import {renderableLabels} from "@/lib/text-labels";
+import {isNeutral, renderableLabels} from "@/lib/text-labels";
 
 interface TextLabelViewProps {
     text: string;
@@ -22,7 +22,8 @@ function offsetWithin(container: HTMLElement, node: Node, offset: number): numbe
     return range.toString().length;
 }
 
-// Read-only view of the process text for labeling: labeled activities are highlighted (critical ones in red),
+// Read-only view of the process text for labeling: labeled activities are highlighted (critical ones in red,
+// neutral passages in gray),
 // selecting a passage with the mouse creates a new label, clicking a highlighted passage selects its label.
 export default function TextLabelView({text, labels, selectedLabelId, onSelectLabel, onSelectRange}: TextLabelViewProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -50,9 +51,11 @@ export default function TextLabelView({text, labels, selectedLabelId, onSelectLa
     let cursor = 0;
     ranges.forEach(label => {
         if (label.start > cursor) parts.push(text.slice(cursor, label.start));
-        const color = label.isCritical
-            ? "bg-destructive/25 hover:bg-destructive/40"
-            : "bg-sky-500/20 hover:bg-sky-500/35";
+        const color = isNeutral(label)
+            ? "bg-slate-500/20 hover:bg-slate-500/35"
+            : label.isCritical
+                ? "bg-destructive/25 hover:bg-destructive/40"
+                : "bg-sky-500/20 hover:bg-sky-500/35";
         const selected = label.id === selectedLabelId ? "ring-2 ring-primary" : "";
         parts.push(
             <mark

@@ -56,6 +56,9 @@ data class ExpectedValue(
  * [start]/[end] are character offsets into the process text (end exclusive, UTF-16 code units — identical in
  * JavaScript and Kotlin), [text] is the labeled passage itself,
  * used to re-anchor the label if the text is edited afterward.
+ *
+ * [kind] NEUTRAL marks a passage that reads like an action but is no activity in the BPMN model (event, gateway,
+ * message, data access): extracted activities there are neither counted as hits nor as errors.
  */
 data class TextLabel(
     val id: String,
@@ -65,8 +68,11 @@ data class TextLabel(
     // Explicit name, so Jackson does not strip the "is" prefix
     @param:JsonProperty("isCritical") @get:JsonProperty("isCritical")
     val isCritical: Boolean = false,
-    val reason: String? = null
+    val reason: String? = null,
+    val kind: TextLabelKind = TextLabelKind.ACTIVITY
 )
+
+enum class TextLabelKind { ACTIVITY, NEUTRAL }
 
 /**
  * The textual process description of a test case with its labels, sent as one JSON part — unlike a plain text part

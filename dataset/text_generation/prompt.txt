@@ -55,7 +55,19 @@ performing this activity is enclosed as {{A<n>|passage}}, for example:
   merely repeats it.
 - Passages must not overlap or be nested; in a combined sentence, each activity gets its own passage.
 - If an activity is mentioned several times (e.g. in a loop), mark only the main description.
-- Only the activities listed under "Activities" are marked; events, decisions, subprocess containers and data are
-  described in the text but not marked.
+- Subprocess containers (S) are described but never marked.
+
+## Marking events, decisions and data handling
+Passages that read like an action but describe an element that is NOT an activity are marked as well, with the alias
+of that element:
+- an event (E), e.g. a message being sent or received, a timer, a start or end: {{E4|schickt die Firma eine Absage}},
+- a gateway (G), i.e. a decision or check of the control flow: {{G2|prüft, ob ein interner Mitarbeiter frei ist}},
+- reading or writing a data object or data store (D) outside of an activity passage:
+  {{D1|die Daten werden in die HÜL-Tabelle geschrieben}}.
+Mark such a passage wherever the text describes it as something happening (the same alias may be marked several
+times); do not mark passages that merely mention the element, and do not mark anything else. Data access that is
+part of an activity stays inside that activity's passage and is not marked separately. These passages follow the
+same rules as activity passages (own verb, no overlap, no nesting).
+
 - Apart from the markings, the output contains nothing but the process description: no introduction, no title, no
   explanation, no code block.

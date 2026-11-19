@@ -61,7 +61,7 @@ export function scoredItems(report: TestCaseReport): Map<string, ScoredItem> {
     const items = new Map<string, ScoredItem>();
     if (report.textResult) {
         for (const label of report.textResult.labels) {
-            if (label.outcome === "IGNORED") continue;
+            if (label.outcome === "IGNORED" || label.outcome === "NEUTRAL") continue;
             items.set(label.id, {
                 key: label.id,
                 name: label.text,

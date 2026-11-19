@@ -59,7 +59,8 @@ EVENT_TYPES = {
 GATEWAY_TYPES = {
     "exclusiveGateway", "parallelGateway", "inclusiveGateway", "eventBasedGateway", "complexGateway",
 }
-MARKER = re.compile(r"\{\{(A\d+)\|(.*?)\}\}", re.DOTALL)
+# Activities (A) become activity labels; events (E), gateways (G) and data (D) become neutral labels
+MARKER = re.compile(r"\{\{([AEGDS]\d+)\|(.*?)\}\}", re.DOTALL)
 LANGUAGES = {"de": "German", "en": "English"}
 
 
@@ -80,7 +81,7 @@ class ModelSummary:
 
     def __init__(self, bpmn_xml):
         root = ET.fromstring(bpmn_xml.encode("utf-8"))
-        self.alias = {}           # element id -> alias (activities A, events E, gateways G, subprocess containers S)
+        self.alias = {}           # element id -> alias (activities A, events E, gateways G, data D, subprocesses S)
         self.activities = []      # [(alias, element id, type, name)] - the labeled activities
         self.lines = {"Activities": [], "Subprocesses (containers, not marked)": [], "Events": [], "Gateways": []}
         self.element_names = {}
@@ -120,7 +121,12 @@ class ModelSummary:
         for kind in ("dataObjectReference", "dataStoreReference", "dataObject", "dataStore", "dataInput", "dataOutput"):
             for el in root.iter(BPMN_NS + kind):
                 label = "data store" if "Store" in kind else "data object"
-                data_names[el.get("id")] = f'{label} "{clean(el.get("name")) or "(unnamed)"}"'
+                counters.setdefault("D", 0)
+                counters["D"] += 1
+                alias = f"D{counters['D']}"
+                self.alias[el.get("id")] = alias
+                self.element_names[alias] = clean(el.get("name"))
+                data_names[el.get("id")] = f'{alias} {label} "{clean(el.get("name")) or "(unnamed)"}"'
 
         for prefix, el, pool, parent in nodes:
             alias, kind, name = self.alias[el.get("id")], local(el.tag), clean(el.get("name"))
@@ -225,9 +231,11 @@ def utf16_len(text):
 
 
 def parse_marked_text(marked, summary):
-    """Removes the markings; returns (text, {alias: (start, end, passage)}, errors). Offsets in UTF-16 code units."""
+    """Removes the markings; returns (text, {activity alias: (start, end, passage)}, [(neutral alias, start, end,
+    passage)], errors). Offsets in UTF-16 code units. Neutral markings (E, G, D) are optional and may repeat."""
     errors = []
     spans = {}
+    neutral = []
     text_parts = []
     position = 0       # in UTF-16 code units of the plain text
     last = 0
@@ -238,9 +246,13 @@ def parse_marked_text(marked, summary):
         alias, passage = match.group(1), match.group(2)
         if not passage.strip():
             errors.append(f"{alias} has an empty passage")
-        if alias in spans:
-            errors.append(f"{alias} is marked more than once")
-        spans.setdefault(alias, (position, position + utf16_len(passage), passage))
+        span = (position, position + utf16_len(passage), passage)
+        if alias.startswith("A"):
+            if alias in spans:
+                errors.append(f"{alias} is marked more than once")
+            spans.setdefault(alias, span)
+        else:
+            neutral.append((alias, *span))
         text_parts.append(passage)
         position += utf16_len(passage)
         last = match.end()
@@ -251,15 +263,17 @@ def parse_marked_text(marked, summary):
         errors.append("the text contains malformed markings ('{{' or '}}' left after parsing)")
     expected = {alias for alias, _, _, _ in summary.activities}
     missing = sorted(expected - spans.keys(), key=lambda a: int(a[1:]))
-    unknown = sorted(spans.keys() - expected)
+    known = set(summary.alias.values()) - {a for a in summary.alias.values() if a.startswith("S")}
+    unknown = sorted((spans.keys() - expected) | ({a for a, _, _, _ in neutral} - known))
     if missing:
         errors.append("not marked: " + ", ".join(f'{a} "{summary.element_names[a]}"' for a in missing))
     if unknown:
-        errors.append("unknown aliases marked (only activities are marked): " + ", ".join(unknown))
+        errors.append("unknown aliases marked (only the listed activities, events, gateways and data; "
+                      "subprocess containers are not marked): " + ", ".join(unknown))
     if text_language(text) != summary.language:
         errors.append(f"the text is not written in {LANGUAGES[summary.language]}; write the whole text in "
                       f"{LANGUAGES[summary.language]}")
-    return text, spans, errors
+    return text, spans, neutral, errors
 
 
 def text_language(text):
@@ -272,7 +286,7 @@ def text_language(text):
     return "de" if german > english else "en"
 
 
-def build_labels(text, spans, summary, expected_values):
+def build_labels(text, spans, neutral, summary, expected_values):
     reasons = {v["value"]: v.get("reason") for v in expected_values}
     labels = []
     for alias, element_id, _, _ in summary.activities:
@@ -287,7 +301,15 @@ def build_labels(text, spans, summary, expected_values):
             "text": passage,
             "isCritical": is_critical,
             "reason": reasons.get(element_id) if is_critical else None,
+            "kind": "ACTIVITY",
         })
+    # Neutral labels: passages describing events, gateways or data access - LLM activities there are not scored
+    id_of = {alias: element_id for element_id, alias in summary.alias.items()}
+    for index, (alias, start, end, passage) in enumerate(neutral):
+        if alias not in id_of:
+            continue  # unknown alias, reported as error by parse_marked_text
+        labels.append({"id": f"text-neutral-{id_of[alias]}-{index}", "start": start, "end": end, "text": passage,
+                       "isCritical": False, "reason": None, "kind": "NEUTRAL"})
     labels.sort(key=lambda label: label["start"])
     # Check against the plain text in UTF-16 code units, exactly as backend and frontend slice it
     units = text.encode("utf-16-le")
@@ -392,7 +414,8 @@ def build_messages(summary, name):
     system = PROMPT_FILE.read_text(encoding="utf-8").replace("{language}", LANGUAGES[summary.language])
     user = (f"Process: {name}\n\n{summary.render()}\n\n"
             f"Write the process description now and mark each of the {len(summary.activities)} activities "
-            f"({', '.join(a for a, _, _, _ in summary.activities)}) exactly once. "
+            f"({', '.join(a for a, _, _, _ in summary.activities)}) exactly once; mark events, decisions and data "
+            f"handling described as something happening with their alias (E, G, D). "
             f"Write the text in {LANGUAGES[summary.language]}.")
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
@@ -426,7 +449,7 @@ def generate_one(args, testcase_id):
             attempts.append({"error": str(error)})
             time.sleep(5 * attempt)
             continue
-        text, spans, errors = parse_marked_text(marked, summary)
+        text, spans, neutral, errors = parse_marked_text(marked, summary)
         attempts.append({"output": marked, "errors": errors})
         if not errors:
             break
@@ -438,8 +461,8 @@ def generate_one(args, testcase_id):
     last = attempts[-1]
     if "output" not in last:
         return f"{testcase_id}: FAILED ({last['error']})"
-    text, spans, errors = parse_marked_text(last["output"], summary)
-    labels = build_labels(text, spans, summary, test_case["expectedValues"])
+    text, spans, neutral, errors = parse_marked_text(last["output"], summary)
+    labels = build_labels(text, spans, neutral, summary, test_case["expectedValues"])
     activity_ids = {element_id for _, element_id, _, _ in summary.activities}
     result = {
         "testcaseId": testcase_id,
@@ -452,7 +475,8 @@ def generate_one(args, testcase_id):
         "textLabels": labels,
         "checks": {
             "activities": len(summary.activities),
-            "labels": len(labels),
+            "labels": len(spans),
+            "neutralLabels": len(neutral),
             "criticalLabels": sum(label["isCritical"] for label in labels),
             "criticalBpmnLabels": len(test_case["expectedValues"]),
             # BPMN labels that cannot become text labels (not a markable activity of the model)
@@ -475,7 +499,7 @@ def generate_one(args, testcase_id):
     OUTPUT_DIR.mkdir(exist_ok=True)
     output_file(testcase_id).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     status = "ok" if not errors else "INVALID: " + "; ".join(errors)
-    return (f"{testcase_id}: {status} ({summary.language}, {len(labels)}/{len(summary.activities)} labels, "
+    return (f"{testcase_id}: {status} ({summary.language}, {len(spans)}/{len(summary.activities)} labels, {len(neutral)} neutral, "
             f"{result['checks']['criticalLabels']} critical, {len(attempts)} attempt(s)) {test_case['name']}")
 
 

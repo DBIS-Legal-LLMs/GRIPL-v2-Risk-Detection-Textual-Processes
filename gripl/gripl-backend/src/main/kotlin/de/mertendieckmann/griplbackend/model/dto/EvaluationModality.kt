@@ -24,7 +24,7 @@ enum class EvaluationModality(val label: String) {
     fun isAvailableFor(testCase: EvaluationData): Boolean = when (this) {
         BPMN -> testCase.bpmnXml != null
         // A text without labels has no ground truth to score against
-        TEXT -> !testCase.processText.isNullOrBlank() && testCase.textLabels.isNotEmpty()
+        TEXT -> !testCase.processText.isNullOrBlank() && testCase.textLabels.any { it.kind == TextLabelKind.ACTIVITY }
         // Scored on the BPMN labels, the text is context only
         BPMN_WITH_TEXT -> testCase.bpmnXml != null && !testCase.processText.isNullOrBlank()
         // Scored on the text labels, the model is a reference only

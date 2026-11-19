@@ -40,6 +40,9 @@ fun falsePositivePredictionIds(result: TextScoringResult): List<String> {
         result.unmatchedCriticalPredictionIds
 }
 
+private fun outcomeOf(result: TextScoringResult, label: TextLabel): TextLabelOutcome =
+    if (label.kind == TextLabelKind.NEUTRAL) TextLabelOutcome.NEUTRAL else outcomeOf(result, label.id)
+
 private fun outcomeOf(result: TextScoringResult, labelId: String): TextLabelOutcome = when (labelId) {
     in result.truePositiveLabelIds -> TextLabelOutcome.TP
     in result.falseNegativeLabelIds -> TextLabelOutcome.FN
@@ -78,11 +81,12 @@ fun buildTextTestCaseResult(
                 text = label.text,
                 isCritical = label.isCritical,
                 reason = label.reason,
-                outcome = outcomeOf(partial, label.id),
+                kind = label.kind,
+                outcome = outcomeOf(partial, label),
                 falseNegativeCause = partial.falseNegativeLabelIds[label.id],
                 matchedPredictionId = match?.predictionId,
                 iou = match?.iou,
-                strictOutcome = outcomeOf(strict, label.id)
+                strictOutcome = outcomeOf(strict, label)
             )
         },
         predictions = partial.located.map { located ->
@@ -94,7 +98,8 @@ fun buildTextTestCaseResult(
                 reason = criticalById[located.activity.id]?.reason,
                 start = located.span?.start,
                 end = located.span?.end,
-                matchedLabelId = matchByPrediction[located.activity.id]?.labelId
+                matchedLabelId = matchByPrediction[located.activity.id]?.labelId,
+                inNeutralLabel = located.activity.id in partial.neutralPredictionIds
             )
         },
         extractionPrecision = partial.extractionPrecision,
@@ -104,6 +109,7 @@ fun buildTextTestCaseResult(
         meanIou = partial.meanIou,
         falseNegativesByExtraction = partial.falseNegativesByExtraction,
         falseNegativesByClassification = partial.falseNegativesByClassification,
+        neutralHits = partial.neutralCriticalCount,
         strict = TextStrictResult(
             truePositives = strict.truePositives,
             falsePositives = strict.falsePositives,

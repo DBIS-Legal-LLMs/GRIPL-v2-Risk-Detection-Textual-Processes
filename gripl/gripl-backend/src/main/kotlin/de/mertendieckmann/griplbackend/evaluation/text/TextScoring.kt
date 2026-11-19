@@ -1,6 +1,7 @@
 package de.mertendieckmann.griplbackend.evaluation.text
 
 import de.mertendieckmann.griplbackend.model.dto.TextLabel
+import de.mertendieckmann.griplbackend.model.dto.TextLabelKind
 
 /**
  * Scoring of the text modality: compares the activities extracted and classified by the text analysis with the
@@ -10,8 +11,9 @@ import de.mertendieckmann.griplbackend.model.dto.TextLabel
  * 1. **Locate** – the quoted passage ([PredictedActivity.exactText]) of every prediction is searched in the text,
  *    tolerating small deviations of the quote ([locatePassage]).
  * 2. **Match** – predicted and labeled spans are paired one-to-one by overlap ([MatchMode]).
- * 3. **Classify** – every label is a unit of the confusion matrix (like a BPMN element): TP/FN for critical labels,
- *    FP/TN for non-critical ones. Critical predictions without a matched label are additional FPs.
+ * 3. **Classify** – every activity label is a unit of the confusion matrix (like a BPMN element): TP/FN for critical
+ *    labels, FP/TN for non-critical ones. Critical predictions without a matched label are additional FPs, unless they
+ *    overlap a neutral label ([TextLabelKind.NEUTRAL]): those are not scored.
  * 4. **Extraction metrics** – how well step 1 of the text pipeline found the labeled activities.
  *
  * All functions are pure, so the procedure can be tested in isolation.
@@ -80,6 +82,8 @@ data class TextScoringResult(
     val falsePositiveLabelIds: List<String>,
     /** Critical predictions that are not matched to any label (not locatable or outside all labels). */
     val unmatchedCriticalPredictionIds: List<String>,
+    /** Unmatched predictions inside a neutral label: not scored, excluded from the extraction precision. */
+    val neutralPredictionIds: List<String>,
     val trueNegativeLabelIds: List<String>,
     /** Labels that were skipped because their offsets no longer point at their passage (orphaned labels). */
     val ignoredLabelIds: List<String>,
@@ -93,11 +97,16 @@ data class TextScoringResult(
     val falseNegativesByClassification: Int get() = falseNegativeLabelIds.count { it.value == FalseNegativeCause.CLASSIFICATION }
 
     val predictedCount: Int get() = located.size
+    val neutralCount: Int get() = neutralPredictionIds.size
+
+    /** Critical predictions inside neutral labels — the false positives the neutral labels avoid. */
+    val neutralCriticalCount: Int
+        get() = located.count { it.activity.isCritical && it.activity.id in neutralPredictionIds }
     val localizedCount: Int get() = located.count { it.span != null }
     val matchedCount: Int get() = matches.size
 
-    /** Share of the extracted activities that correspond to a labeled activity. */
-    val extractionPrecision: Double get() = ratio(matchedCount, predictedCount)
+    /** Share of the extracted activities (except those in neutral labels) that correspond to a labeled activity. */
+    val extractionPrecision: Double get() = ratio(matchedCount, predictedCount - neutralCount)
 
     /** Share of the labeled activities that were extracted. */
     val extractionRecall: Double get() = ratio(matchedCount, labelCount)
@@ -264,19 +273,26 @@ fun scoreText(
     mode: MatchMode = MatchMode.PARTIAL
 ): TextScoringResult {
     val (anchoredLabels, orphanedLabels) = labels.partition { isLabelAnchored(processText, it) }
+    val (activityLabels, neutralLabels) = anchoredLabels.partition { it.kind == TextLabelKind.ACTIVITY }
     val located = locateActivities(processText, predictions)
-    val matches = matchSpans(anchoredLabels, located, mode)
+    val matches = matchSpans(activityLabels, located, mode)
 
     val predictionByLabelId = matches.associate { match ->
         match.labelId to located.first { it.activity.id == match.predictionId }.activity
     }
     val matchedPredictionIds = matches.map { it.predictionId }.toSet()
+    // Neutral labels only take predictions no activity label took, so they never compete with the activities
+    val neutralPredictionIds = located.filter { prediction ->
+        val span = prediction.span
+        prediction.activity.id !in matchedPredictionIds && span != null &&
+            neutralLabels.any { TextSpan(it.start, it.end).overlap(span) > 0 }
+    }.map { it.activity.id }
 
     val truePositives = mutableListOf<String>()
     val falseNegatives = linkedMapOf<String, FalseNegativeCause>()
     val falsePositives = mutableListOf<String>()
     val trueNegatives = mutableListOf<String>()
-    for (label in anchoredLabels.sortedBy { it.start }) {
+    for (label in activityLabels.sortedBy { it.start }) {
         val prediction = predictionByLabelId[label.id]
         val predictedCritical = prediction?.isCritical == true
         when {
@@ -296,10 +312,11 @@ fun scoreText(
         falseNegativeLabelIds = falseNegatives,
         falsePositiveLabelIds = falsePositives,
         unmatchedCriticalPredictionIds = located
-            .filter { it.activity.isCritical && it.activity.id !in matchedPredictionIds }
+            .filter { it.activity.isCritical && it.activity.id !in matchedPredictionIds && it.activity.id !in neutralPredictionIds }
             .map { it.activity.id },
+        neutralPredictionIds = neutralPredictionIds,
         trueNegativeLabelIds = trueNegatives,
         ignoredLabelIds = orphanedLabels.map { it.id },
-        labelCount = anchoredLabels.size
+        labelCount = activityLabels.size
     )
 }

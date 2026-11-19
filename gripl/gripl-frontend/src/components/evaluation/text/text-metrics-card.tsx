@@ -46,6 +46,9 @@ export default function TextMetricsCard({metrics}: TextMetricsCardProps) {
                     <div className="text-lg font-semibold">
                         {metrics.falseNegativesByExtraction} / {metrics.falseNegativesByClassification}
                     </div>
+                    {metrics.neutralHits != null && <div className="mt-1 text-xs text-muted-foreground">
+                        {metrics.neutralHits} critical LLM activities in neutral passages (not scored)
+                    </div>}
                 </div>
                 <div className="rounded-md bg-muted/50 p-3">
                     <div className="text-muted-foreground">Strict matching (IoU ≥ 0.5): P / R / F1</div>

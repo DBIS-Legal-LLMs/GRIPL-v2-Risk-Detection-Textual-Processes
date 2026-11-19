@@ -73,7 +73,8 @@ export interface TestCaseReport {
     markdown: string;
 }
 
-export type TextLabelOutcome = "TP" | "FP" | "FN" | "TN" | "IGNORED";
+// NEUTRAL: neutral label (no activity in the BPMN model), not scored
+export type TextLabelOutcome = "TP" | "FP" | "FN" | "TN" | "IGNORED" | "NEUTRAL";
 export type FalseNegativeCause = "EXTRACTION" | "CLASSIFICATION";
 
 // Metrics of the text scoring with strict matching (IoU >= 0.5)
@@ -91,6 +92,7 @@ export interface TextLabelResult {
     text: string;
     isCritical: boolean;
     reason?: string | null;
+    kind?: "ACTIVITY" | "NEUTRAL";
     // outcome with partial matching (the main measure)
     outcome: TextLabelOutcome;
     falseNegativeCause?: FalseNegativeCause | null;
@@ -110,6 +112,8 @@ export interface TextPredictionResult {
     end?: number | null;
     // label it is matched to with partial matching
     matchedLabelId?: string | null;
+    // not matched to an activity label, but inside a neutral label: not scored
+    inNeutralLabel?: boolean;
 }
 
 export interface TextTestCaseResult {
@@ -123,6 +127,8 @@ export interface TextTestCaseResult {
     meanIou: number;
     falseNegativesByExtraction: number;
     falseNegativesByClassification: number;
+    // critical LLM activities inside neutral labels, not counted as false positives (absent in older reports)
+    neutralHits?: number;
     strict: TextStrictResult;
 }
 
@@ -137,6 +143,7 @@ export interface TextSummaryMetrics {
     meanIou: number;
     falseNegativesByExtraction: number;
     falseNegativesByClassification: number;
+    neutralHits?: number;
     strict: TextStrictResult;
 }
 

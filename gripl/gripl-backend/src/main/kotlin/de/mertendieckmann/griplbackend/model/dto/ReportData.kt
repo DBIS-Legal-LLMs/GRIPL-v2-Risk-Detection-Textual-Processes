@@ -264,6 +264,7 @@ private fun textResultMarkdown(r: TextTestCaseResult): String = buildString {
     appendLine("- **Extraction P/R/F1:** ${f3(r.extractionPrecision)} / ${f3(r.extractionRecall)} / ${f3(r.extractionF1)}")
     appendLine("- **Localized Quotes:** ${f3(r.localizationRate)}, **Mean IoU:** ${f3(r.meanIou)}")
     appendLine("- **False Negatives by Extraction / Classification:** ${r.falseNegativesByExtraction} / ${r.falseNegativesByClassification}")
+    appendLine("- **Critical Predictions in Neutral Labels (not scored):** ${r.neutralHits}")
     appendLine("- **Strict (IoU >= 0.5):** TP ${r.strict.truePositives}, FP ${r.strict.falsePositives}, FN ${r.strict.falseNegatives}, TN ${r.strict.trueNegatives}")
     appendLine()
     appendLine("| Label | Critical | Outcome | Strict | Prediction | IoU |")
@@ -272,7 +273,7 @@ private fun textResultMarkdown(r: TextTestCaseResult): String = buildString {
         val outcome = l.outcome.name + (l.falseNegativeCause?.let { " (${it.name.lowercase()})" } ?: "")
         appendLine("| ${l.text.replace(Regex("\\s+"), " ").replace("|", "/")} | ${if (l.isCritical) "yes" else "no"} | $outcome | ${l.strictOutcome} | ${l.matchedPredictionId ?: "-"} | ${l.iou?.let { f3(it) } ?: "-"} |")
     }
-    val unmatched = r.predictions.filter { it.matchedLabelId == null }
+    val unmatched = r.predictions.filter { it.matchedLabelId == null && !it.inNeutralLabel }
     if (unmatched.isNotEmpty()) {
         appendLine()
         appendLine("Unmatched predictions: " + unmatched.joinToString(", ") {
@@ -290,6 +291,7 @@ private fun textSummaryMarkdown(t: TextSummaryMetrics): String = buildString {
     appendLine("Localized Quotes: ${f3(t.localizationRate)}")
     appendLine("Mean IoU: ${f3(t.meanIou)}")
     appendLine("False Negatives by Extraction / Classification: ${t.falseNegativesByExtraction} / ${t.falseNegativesByClassification}")
+    appendLine("Critical Predictions in Neutral Labels (not scored): ${t.neutralHits}")
     appendLine("Strict Matching (IoU >= 0.5): Precision ${f3(t.strict.precision)}, Recall ${f3(t.strict.recall)}, " +
         "F1 ${f3(t.strict.f1Score)}, Accuracy ${f3(t.strict.accuracy)} " +
         "(TP ${t.strict.truePositives}, FP ${t.strict.falsePositives}, FN ${t.strict.falseNegatives}, TN ${t.strict.trueNegatives})")

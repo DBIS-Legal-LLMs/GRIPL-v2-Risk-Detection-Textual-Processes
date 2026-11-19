@@ -23,6 +23,7 @@ const OUTCOME_STYLE: Record<TextLabelOutcome, { color: string; label: string }> 
     FN: {color: defaultColors.falseNegative, label: "False Negative"},
     TN: {color: defaultColors.trueNegative, label: "True Negative"},
     IGNORED: {color: "#9ca3af", label: "Ignored (orphaned label)"},
+    NEUTRAL: {color: "#64748b", label: "Neutral (not scored)"},
 };
 
 interface Segment {
@@ -69,7 +70,8 @@ export default function TestCaseReportCardTextPreview({report}: TestCaseReportCa
     const [mode, setMode] = useState<MatchMode>("partial");
 
     const predictionById = useMemo(() => new Map(result.predictions.map((p) => [p.id, p])), [result]);
-    const unmatched = useMemo(() => result.predictions.filter((p) => !p.matchedLabelId), [result]);
+    // LLM activities inside neutral labels are not scored and not listed as unmatched
+    const unmatched = useMemo(() => result.predictions.filter((p) => !p.matchedLabelId && !p.inNeutralLabel), [result]);
     const segments = useMemo(() => segmentText(result, unmatched), [result, unmatched]);
 
     const outcomeOf = (label: TextLabelResult) => (mode === "partial" ? label.outcome : label.strictOutcome);
@@ -124,7 +126,7 @@ export default function TestCaseReportCardTextPreview({report}: TestCaseReportCa
             {/* Legend: outcome counts of the labels in the selected mode */}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {(Object.keys(OUTCOME_STYLE) as TextLabelOutcome[])
-                    .filter((o) => o !== "IGNORED" || counts.IGNORED)
+                    .filter((o) => (o !== "IGNORED" && o !== "NEUTRAL") || counts[o])
                     .map((outcome) => (
                         <span key={outcome} className="flex items-center gap-1.5">
                             <span className="inline-block h-3 w-3 rounded-sm" style={{backgroundColor: OUTCOME_STYLE[outcome].color}}/>
@@ -175,6 +177,8 @@ export default function TestCaseReportCardTextPreview({report}: TestCaseReportCa
                 <Metric label="Mean IoU" value={format(result.meanIou)}/>
                 <Metric label="FN extraction / classification"
                         value={`${result.falseNegativesByExtraction} / ${result.falseNegativesByClassification}`}/>
+                {result.neutralHits != null && <Metric label="Critical in neutral passages (not scored)"
+                                                       value={`${result.neutralHits}`}/>}
             </div>
             {mode === "strict" && <p className="text-xs text-muted-foreground">
                 Strict: TP {result.strict.truePositives}, FP {result.strict.falsePositives}, FN {result.strict.falseNegatives},

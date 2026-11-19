@@ -89,7 +89,7 @@ class MetricsAccumulator {
         if (denominator.toDouble() > 0) numerator.toDouble() / denominator.toDouble() else 0.0
 
     private fun toTextSummary(t: TextMetrics): TextSummaryMetrics {
-        val extractionPrecision = ratio(t.matchedCount, t.predictedCount)
+        val extractionPrecision = ratio(t.matchedCount, t.predictedCount - t.neutralCount)
         val extractionRecall = ratio(t.matchedCount, t.labelCount)
         val strict = deriveMetrics(t.strict.truePositives, t.strict.falsePositives, t.strict.falseNegatives, t.strict.trueNegatives)
         return TextSummaryMetrics(
@@ -105,6 +105,7 @@ class MetricsAccumulator {
             meanIou = ratio(t.iouSum, t.matchedCount),
             falseNegativesByExtraction = t.falseNegativesByExtraction,
             falseNegativesByClassification = t.falseNegativesByClassification,
+            neutralHits = t.neutralCriticalCount,
             strict = TextStrictResult(
                 truePositives = t.strict.truePositives,
                 falsePositives = t.strict.falsePositives,

@@ -10,7 +10,7 @@ import {Button} from "@/components/ui/button";
 import {AlertTriangle, FileText, Trash2} from "lucide-react";
 import TextLabelView from "@/components/labeling/text-label-view";
 import LabelingEditorLabelCard from "@/components/labeling/labeling-editor-label-card";
-import {createTextLabelId, isAnchored, overlaps} from "@/lib/text-labels";
+import {createTextLabelId, isAnchored, isNeutral, overlaps} from "@/lib/text-labels";
 import {useToast} from "@/components/ui/toast";
 
 interface TextLabelingEditorProps {
@@ -36,6 +36,7 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
     const selectedLabel = labels.find(label => label.id === selectedLabelId) ?? null;
     const sortedLabels = [...labels].sort((a, b) => a.start - b.start);
     const criticalCount = labels.filter(label => label.isCritical).length;
+    const neutralCount = labels.filter(isNeutral).length;
 
     function handleSelectRange(start: number, end: number) {
         if (labels.some(label => isAnchored(processText, label) && overlaps(label, {start, end}))) {
@@ -55,9 +56,22 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
 
     function handleLabelingChange(labelId: string, isChecked: boolean, reason: string) {
         onLabelsChange(labels.map(label => label.id === labelId
-            ? {...label, isCritical: isChecked, reason: isChecked ? reason : undefined}
+            // A critical passage is an activity
+            ? {...label, isCritical: isChecked, reason: isChecked ? reason : undefined, kind: isChecked ? "ACTIVITY" : label.kind}
             : label
         ));
+    }
+
+    // Neutral passages (event, gateway, message, data access in the BPMN model) are never critical
+    function handleNeutralChange(labelId: string, neutral: boolean) {
+        onLabelsChange(labels.map(label => label.id === labelId
+            ? {...label, kind: neutral ? "NEUTRAL" : "ACTIVITY", isCritical: neutral ? false : label.isCritical, reason: neutral ? undefined : label.reason}
+            : label
+        ));
+    }
+
+    function dotColor(label: TextLabel): string {
+        return isNeutral(label) ? "bg-slate-500" : label.isCritical ? "bg-destructive" : "bg-sky-500";
     }
 
     function handleDeleteLabel(labelId: string) {
@@ -113,10 +127,21 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
                         <Label htmlFor="text-label-mode">Label Mode</Label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        {labels.length} activities labeled, {criticalCount} GDPR critical
+                        {labels.length - neutralCount} activities labeled, {criticalCount} GDPR critical
+                        {neutralCount > 0 && `, ${neutralCount} neutral passages`}
                     </p>
                 </CardContent>
             </Card>
+            {isLabelMode && selectedLabel && <div className="flex items-center space-x-2 px-1">
+                <Switch
+                    id="text-label-neutral"
+                    checked={isNeutral(selectedLabel)}
+                    onCheckedChange={(checked) => handleNeutralChange(selectedLabel.id, checked)}
+                />
+                <Label htmlFor="text-label-neutral" className="text-xs">
+                    Neutral passage (no activity in the model, not scored)
+                </Label>
+            </div>}
             {isLabelMode && selectedLabel && <LabelingEditorLabelCard
                 elementName="Activity"
                 subtitle={selectedLabel.text}
@@ -140,6 +165,10 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
                             <span className="inline-block h-2 w-2 rounded-full bg-sky-500"/>
                             Activity
                         </span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="inline-block h-2 w-2 rounded-full bg-slate-500"/>
+                            Neutral
+                        </span>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-1">
@@ -154,7 +183,7 @@ export default function TextLabelingEditor({title, processText, labels, onTextCh
                                 }}
                                 title={anchored ? label.text : "The labeled passage no longer exists in the text"}
                             >
-                                <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${label.isCritical ? "bg-destructive" : "bg-sky-500"}`}/>
+                                <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${dotColor(label)}`}/>
                                 {!anchored && <AlertTriangle className="mr-1 inline h-3 w-3 text-destructive"/>}
                                 <span className={anchored ? "" : "line-through text-muted-foreground"}>{excerpt(label.text, 45)}</span>
                             </button>
