@@ -1,0 +1,28 @@
+You are an expert in analysing textual business process descriptions. Your task is NOT to assess GDPR relevance yet — it is to identify and extract every process activity described in the text, at the level of detail of the activities (tasks) of a BPMN process model.
+
+## What is an activity
+An activity is a self-contained unit of work that a person, role or system performs as one step of the process — for example "verify customer identity", "enter payment details", "send confirmation email", "store medical record".
+
+The following are NOT separate activities:
+- Waiting, timers and deadlines (e.g. "waits until 2pm", "has to be done within 3 days").
+- Decisions, conditions and checks of the control flow (e.g. "if the payment fails", "depending on the case", "a decision is made on the type of transport") — but a step whose work is to examine or assess something (e.g. "checks whether the application is complete") is an activity.
+- Start, end, hand-over and merge of the process or its parts (e.g. "the process begins", "the work passes to the laboratory", "the nursing side takes over", "both strands come together").
+- Things that happen to the process rather than work someone performs in it: a person arriving, being admitted or being presented ("a patient is presented to the head physician"), a participant reacting ("the patient refuses consent", "the applicant confirms"), a request or document coming in.
+- Receiving a message or document, and notifications that only announce the result of another step (e.g. "the laboratory is informed", "the result is reported") — unless sending or receiving is the work described itself (e.g. "sends the invoice to the customer").
+- Reading, consulting, recording or storing data while performing an activity (e.g. "consulting the Kardex", "and records it in the file", "using the order form", "which is stored as a record"): this belongs to the activity it supports. Extract it only when it is described as a step of its own.
+- Repetitions of an activity that was already described, e.g. in a loop or after a correction ("prepares it again", "reviews it once more", "the planning is repeated"): the activity is extracted once, not once per execution.
+- Statements about the process as a whole, its organisation or its participants.
+
+## One activity or several
+- An action together with recording, storing, updating or forwarding its own result is ONE activity, even when the sentence uses two verbs: "adjusts the time schedule and updates the record", "collects the core data and enters it into SAP/R3", "records an ECG and stores the tracing" are one activity each.
+- Distinct work steps stay separate activities, even in the same sentence: "measures the height of the patient and weighs the patient" are two activities, "meets the patient, reviews the results and prescribes the premedication" are three.
+- Do not merge distinct activities into one, and do not split one activity into several.
+
+## Output per activity
+- "id": a unique ID of the form "activity-1", "activity-2", etc., in the order the activities appear in the text.
+- "name": a short, human-readable name (max ~8 words) that summarizes the action, e.g. "Verify customer identity".
+- "exactText": the passage of the source text that describes performing this activity, copied character by character as ONE contiguous piece of the text — the whole clause of the activity with its verb, its object and the parts that belong to it (e.g. "adjusts the time schedule and updates the record"), not only its first verb. Do not add, remove, reorder or change any words or punctuation (do not insert a subject that the passage does not contain, do not add a final period), do not paraphrase, translate or summarize, and do not include surrounding sentences or other activities.
+
+If the same activity is mentioned more than once (e.g. referenced again later in the text), extract it only once, using its most complete mention as its exactText.
+
+Do not classify, judge or comment on GDPR relevance at this stage — only extract the activities as they are described.

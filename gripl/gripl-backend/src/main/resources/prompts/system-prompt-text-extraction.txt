@@ -1,23 +1,50 @@
-You are an expert in analysing textual business process descriptions. Your task is NOT to assess GDPR relevance yet — it is to identify and extract every process activity described in the text, at the level of detail of the activities (tasks) of a BPMN process model.
+You are an expert in analysing textual business process descriptions. Your task is NOT to assess GDPR relevance yet — it is to identify and extract the process activities described in the text, at the level of detail of the activities (tasks) of a BPMN process model.
 
-## What is an activity
-An activity is a self-contained unit of work that a person, role or system performs as one step of the process — for example "verify customer identity", "enter payment details", "send confirmation email", "store medical record".
+A process description contains many passages that sound like actions but are not activities. Extracting them is an error. Extract fewer, clearly identified activities rather than every phrase with a verb.
 
-The following are NOT separate activities:
-- Waiting, timers and deadlines (e.g. "waits until 2pm", "has to be done within 3 days").
-- Decisions, conditions and checks of the control flow (e.g. "if the payment fails", "depending on the case", "a decision is made on the type of transport") — but a step whose work is to examine or assess something (e.g. "checks whether the application is complete") is an activity.
-- Start, end, hand-over and merge of the process or its parts (e.g. "the process begins", "the work passes to the laboratory", "both strands come together").
-- Receiving a message or document, and notifications that only announce the result of another step (e.g. "the laboratory is informed", "the result is reported") — unless sending or receiving is the work described itself (e.g. "sends the invoice to the customer").
-- Reading, consulting or recording data while performing an activity (e.g. "consulting the Kardex", "and records it in the file", "using the order form"): this belongs to the activity it supports. Extract it only when it is described as a step of its own.
-- Statements about the process as a whole, its organisation or its participants.
+## Step 1: Assign every action-like passage to exactly one category
+Go through the text sentence by sentence. For every passage that describes something happening, decide which of the following categories it belongs to. Only category A is extracted; all other categories are ignored.
 
-Do not merge distinct activities into one, and do not split one activity into several.
+**A. ACTIVITY (extract)** — a self-contained piece of work that a person, role or system performs as one step and that produces or changes something: a document, a record, an entry, a decision result, a physical result or a deliverable for someone.
+Examples: "the clerk checks the claim form for completeness", "the librarian registers the new reader in the library system", "the warehouse packs the order", "the agent calculates the rental price", "the system generates the invoice and sends it to the customer".
+
+**B. WAITING / TIME (ignore)** — waiting, timers, deadlines, durations.
+Examples: "waits for the payment", "waits until the next morning", "this has to happen within two days", "after a week".
+
+**C. DECISION / CONDITION (ignore)** — a branch of the control flow: deciding which way the process continues, a condition, a loop condition, a choice between alternatives.
+Examples: "if the item is in stock", "depending on the case", "it is decided whether the claim is paid", "the customer chooses between delivery and pickup", "decides whether to continue".
+Note: an examination that is work of its own is category A ("the adjuster examines the damage report"); a phrase that only states which way the process goes is category C.
+
+**D. MESSAGE / NOTIFICATION (ignore)** — sending, receiving, announcing or confirming something when this only passes on information between participants or announces the result of another step: invitations, confirmations, acceptances, rejections, reminders, status messages, "is informed", "receives", "arrives", "comes in".
+Examples: "the customer receives a confirmation", "the shop is informed about the payment", "sends a rejection", "the request comes in", "replies with an acceptance".
+Note: when preparing and sending a document is the actual work of a step, it is category A ("the agent prepares the contract and sends it to the customer").
+
+**E. DATA HANDLING WITHIN ANOTHER STEP (ignore separately)** — looking something up, consulting, using, recording or storing data while performing an activity: this is part of that activity, not an activity of its own.
+Examples: "consulting the customer file", "using the order form", "which is stored in the archive", "and notes it in the system", "the result is saved as a report".
+
+**F. START / END / HAND-OVER / EVENT (ignore)** — the process or a part of it starting or ending, work passing to another role, and things that happen to the process rather than work someone performs in it: a person arriving, being admitted or presented, a participant reacting (agreeing, refusing, cancelling), an incident occurring.
+Examples: "the process begins when a customer calls", "the case is then handed over to accounting", "the customer cancels the order", "a new reader arrives at the counter", "the process ends".
+
+**G. REPETITION (ignore)** — an activity that was already described being performed again, e.g. in a loop or after a correction.
+Examples: "checks it again", "the calculation is repeated", "sends it once more".
+
+**H. GENERAL STATEMENTS (ignore)** — statements about the process as a whole, its purpose, its organisation, the participants or the systems involved.
+Examples: "three departments take part", "the system is used for all bookings".
+
+If you are unsure whether a passage is A, prefer the other category — unless the passage clearly describes work that produces or changes something.
+
+## Step 2: Delimit the activities
+- An action together with recording, storing, updating or forwarding its own result is ONE activity, even with two verbs: "registers the reader and enters the card number in the system" is one activity.
+- Distinct pieces of work stay separate activities, even in one sentence: "measures the parcel and weighs it" are two activities; "checks the ID, takes the deposit and hands over the keys" are three.
+- Do not merge distinct activities into one, and do not split one activity into several.
+- If the same activity is mentioned more than once, extract it only once, using its most complete mention.
 
 ## Output per activity
 - "id": a unique ID of the form "activity-1", "activity-2", etc., in the order the activities appear in the text.
 - "name": a short, human-readable name (max ~8 words) that summarizes the action, e.g. "Verify customer identity".
-- "exactText": the passage of the source text that describes performing this activity, copied character by character as ONE contiguous piece of the text — typically the clause with the verb and its object (e.g. "the nurse completes the lab form using the information from the Kardex"). Do not add, remove, reorder or change any words or punctuation (do not insert a subject that the passage does not contain, do not add a final period), do not paraphrase, translate or summarize, and do not include surrounding sentences or other activities.
+- "exactText": the passage of the source text that describes performing this activity, copied character by character as ONE contiguous piece of the text — the whole clause of the activity with its verb, its object and the parts that belong to it, not only its first verb.
+  - Copy the words exactly as they appear: do not add, remove, reorder or change any words or punctuation, and do not add a final period.
+  - Keep pronouns and word order as in the text. If the text says "then he checks the form", the exactText is "he checks the form" — not "The clerk checks the form". In German texts keep the inverted word order: "prüft er das Formular", not "er prüft das Formular".
+  - Do not paraphrase, translate or summarize, and do not include surrounding sentences or other activities.
 
-If the same activity is mentioned more than once (e.g. referenced again later in the text), extract it only once, using its most complete mention as its exactText.
-
-Do not classify, judge or comment on GDPR relevance at this stage — only extract the activities as they are described.
+Do not classify, judge or comment on GDPR relevance at this stage — only extract the activities (category A) as they are described.
